@@ -1,0 +1,22 @@
+
+services:
+  postgres:
+    image: postgres:17
+    container_name: coffeepilot-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_DB: coffeepilot
+      POSTGRES_USER: coffeepilot
+      POSTGRES_PASSWORD: ${DB_PASSWORD:?Defina DB_PASSWORD no arquivo .env}
+    ports:
+      - "5433:5432"
+    volumes:
+      - coffeepilot-postgres-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U coffeepilot -d coffeepilot"]
+      interval: 5s
+      timeout: 5s
+      retries: 5
+
+volumes:
+  coffeepilot-postgres-data:
