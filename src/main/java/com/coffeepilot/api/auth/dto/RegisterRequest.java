@@ -1,8 +1,11 @@
 package com.coffeepilot.api.auth.dto;
 
+import jakarta.validation.constraints.AssertTrue;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
+
+import java.nio.charset.StandardCharsets;
 
 public record RegisterRequest(
 
@@ -24,6 +27,12 @@ public record RegisterRequest(
         String password
 
 ) {
+
+    @AssertTrue(message = "A senha é longa demais. Use no máximo 72 bytes (caracteres especiais ocupam mais de um).")
+    public boolean isPasswordWithinBcryptLimit() {
+        return password == null
+                || password.getBytes(StandardCharsets.UTF_8).length <= 72;
+    }
 
     @Override
     public String toString() {
