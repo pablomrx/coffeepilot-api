@@ -28,7 +28,7 @@ public record RegisterRequest(
 
 ) {
 
-    @AssertTrue(message = "A senha é longa demais. Use no máximo 72 bytes (caracteres especiais ocupam mais de um).")
+    @AssertTrue(message = "A senha é muito longa. Use uma senha mais curta.")
     public boolean isPasswordWithinBcryptLimit() {
         return password == null
                 || password.getBytes(StandardCharsets.UTF_8).length <= 72;
