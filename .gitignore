@@ -43,3 +43,6 @@ Thumbs.db
 
 ### Logs ###
 *.log
+
+# Postman local files
+/postman/
