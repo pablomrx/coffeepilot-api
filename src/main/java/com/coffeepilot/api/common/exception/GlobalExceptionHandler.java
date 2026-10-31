@@ -27,6 +27,12 @@ public class GlobalExceptionHandler {
             LoggerFactory.getLogger(GlobalExceptionHandler.class);
 
     private static final String EMAIL_UNIQUE_CONSTRAINT = "uq_users_email";
+    private static final String INGREDIENT_NAME_UNIQUE_CONSTRAINT =
+            "uq_ingredients_coffee_shop_name";
+    private static final String REVERSAL_UNIQUE_CONSTRAINT =
+            "uq_stock_movements_reverses_movement";
+    private static final String INITIAL_UNIQUE_CONSTRAINT =
+            "uq_stock_movements_initial_per_ingredient";
     private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
     @ExceptionHandler(EmailAlreadyUsedException.class)
@@ -44,15 +50,86 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(ResourceNotFoundException.class)
+    public ResponseEntity<ApiError> handleNotFound(
+            ResourceNotFoundException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                HttpStatus.NOT_FOUND,
+                ex.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
+    @ExceptionHandler(BusinessConflictException.class)
+    public ResponseEntity<ApiError> handleConflict(
+            BusinessConflictException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                HttpStatus.CONFLICT,
+                ex.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
+    @ExceptionHandler(BusinessRuleException.class)
+    public ResponseEntity<ApiError> handleBusinessRule(
+            BusinessRuleException ex,
+            HttpServletRequest request
+    ) {
+        return build(
+                HttpStatus.BAD_REQUEST,
+                ex.getMessage(),
+                request,
+                List.of()
+        );
+    }
+
     @ExceptionHandler(DataIntegrityViolationException.class)
     public ResponseEntity<ApiError> handleDataIntegrity(
             DataIntegrityViolationException ex,
             HttpServletRequest request
     ) {
-        if (isEmailUniqueViolation(ex)) {
+        if (hasUniqueViolation(ex, EMAIL_UNIQUE_CONSTRAINT)) {
             return handleEmailAlreadyUsed(
                     new EmailAlreadyUsedException(),
                     request
+            );
+        }
+
+        if (hasUniqueViolation(ex, INGREDIENT_NAME_UNIQUE_CONSTRAINT)) {
+            return build(
+                    HttpStatus.CONFLICT,
+                    "Já existe um ingrediente com este nome.",
+                    request,
+                    List.of(
+                            new ApiError.FieldViolation(
+                                    "name",
+                                    "Já existe um ingrediente com este nome."
+                            )
+                    )
+            );
+        }
+
+        if (hasUniqueViolation(ex, REVERSAL_UNIQUE_CONSTRAINT)) {
+            return build(
+                    HttpStatus.CONFLICT,
+                    "Esta movimentação já foi estornada.",
+                    request,
+                    List.of()
+            );
+        }
+
+        if (hasUniqueViolation(ex, INITIAL_UNIQUE_CONSTRAINT)) {
+            return build(
+                    HttpStatus.CONFLICT,
+                    "O ingrediente já possui movimentações de estoque.",
+                    request,
+                    List.of()
             );
         }
 
@@ -167,21 +244,22 @@ public class GlobalExceptionHandler {
         );
     }
 
-    private boolean isEmailUniqueViolation(
-            DataIntegrityViolationException ex
+    private boolean hasUniqueViolation(
+            DataIntegrityViolationException ex,
+            String constraintName
     ) {
         Throwable cause = ex;
 
         while (cause != null) {
             if (cause instanceof ConstraintViolationException violation
-                    && EMAIL_UNIQUE_CONSTRAINT.equals(violation.getConstraintName())) {
+                    && constraintName.equals(violation.getConstraintName())) {
                 return true;
             }
 
             if (cause instanceof SQLException sqlException
                     && UNIQUE_VIOLATION_SQL_STATE.equals(sqlException.getSQLState())
                     && sqlException.getMessage() != null
-                    && sqlException.getMessage().contains(EMAIL_UNIQUE_CONSTRAINT)) {
+                    && sqlException.getMessage().contains(constraintName)) {
                 return true;
             }
 
