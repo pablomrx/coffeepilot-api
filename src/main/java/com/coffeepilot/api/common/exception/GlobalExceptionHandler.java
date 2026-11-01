@@ -274,6 +274,10 @@ public class GlobalExceptionHandler {
             return "password";
         }
 
+        if ("quantityDeltaNotZero".equals(field)) {
+            return "quantityDelta";
+        }
+
         return field;
     }
 
