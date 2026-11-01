@@ -292,6 +292,12 @@ public class StockMovement {
                 );
             }
 
+            if (description == null) {
+                throw new IllegalArgumentException(
+                        "Reversal description is required."
+                );
+            }
+
             validateReversal();
 
         } else if (reversesMovement != null) {

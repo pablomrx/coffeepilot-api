@@ -157,6 +157,12 @@ public class StockService {
                 REVERSAL_ROLES
         );
 
+        if (description == null || description.isBlank()) {
+            throw new BusinessRuleException(
+                    "A justificativa do estorno é obrigatória."
+            );
+        }
+
         Long coffeeShopId = actor.getCoffeeShop().getId();
 
         StockMovement original = movementRepository
