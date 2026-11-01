@@ -92,6 +92,15 @@ CREATE TABLE stock_movements (
             )
         ),
 
+    CONSTRAINT ck_stock_movements_reversal_requires_description
+        CHECK (
+            type <> 'REVERSAL'
+            OR (
+                description IS NOT NULL
+                AND BTRIM(description) <> ''
+            )
+        ),
+
     CONSTRAINT ck_stock_movements_reason_only_adjustment
         CHECK (
             type = 'ADJUSTMENT'
