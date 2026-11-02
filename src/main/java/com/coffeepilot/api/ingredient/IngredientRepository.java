@@ -70,29 +70,45 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
             @Param("name") String name
     );
 
-    // Lista todos os ingredientes de uma cafeteria com paginação.
-    Page<Ingredient> findByCoffeeShopId(
-            Long coffeeShopId,
-            Pageable pageable
-    );
-
-    // Lista ingredientes de uma cafeteria filtrando pela situação.
-    Page<Ingredient> findByCoffeeShopIdAndActive(
-            Long coffeeShopId,
-            boolean active,
-            Pageable pageable
-    );
-
-    // Lista ingredientes ativos cujo saldo está no limite ou abaixo do mínimo.
-    @Query("""
-            SELECT i FROM Ingredient i
-            WHERE i.coffeeShopId = :coffeeShopId
-              AND i.active = TRUE
-              AND i.minimumQuantity > 0
-              AND i.currentQuantity <= i.minimumQuantity
-            """)
-    Page<Ingredient> findLowStock(
+    // Lista ingredientes de uma cafeteria com filtros opcionais e paginação.
+    @Query(
+            value = """
+                    SELECT i FROM Ingredient i
+                    WHERE i.coffeeShopId = :coffeeShopId
+                      AND (
+                          CAST(:active AS Boolean) IS NULL
+                          OR i.active = :active
+                      )
+                      AND (
+                          :lowStock = FALSE
+                          OR (
+                              i.active = TRUE
+                              AND i.minimumQuantity > 0
+                              AND i.currentQuantity <= i.minimumQuantity
+                          )
+                      )
+                    """,
+            countQuery = """
+                    SELECT COUNT(i) FROM Ingredient i
+                    WHERE i.coffeeShopId = :coffeeShopId
+                      AND (
+                          CAST(:active AS Boolean) IS NULL
+                          OR i.active = :active
+                      )
+                      AND (
+                          :lowStock = FALSE
+                          OR (
+                              i.active = TRUE
+                              AND i.minimumQuantity > 0
+                              AND i.currentQuantity <= i.minimumQuantity
+                          )
+                      )
+                    """
+    )
+    Page<Ingredient> findByFilters(
             @Param("coffeeShopId") Long coffeeShopId,
+            @Param("active") Boolean active,
+            @Param("lowStock") boolean lowStock,
             Pageable pageable
     );
 }
