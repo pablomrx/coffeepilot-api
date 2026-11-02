@@ -16,6 +16,7 @@ import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.validation.BeanPropertyBindingResult;
 import org.springframework.validation.FieldError;
 import org.springframework.web.bind.MethodArgumentNotValidException;
+import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.server.ResponseStatusException;
 
 class GlobalExceptionHandlerTest {
@@ -36,15 +37,17 @@ class GlobalExceptionHandlerTest {
     private void dummyEndpoint(String body) {
     }
 
+    private MethodParameter dummyParameter() throws NoSuchMethodException {
+        Method method = getClass().getDeclaredMethod("dummyEndpoint", String.class);
+        return new MethodParameter(method, 0);
+    }
+
     private MethodArgumentNotValidException validationError(String field, String message)
             throws NoSuchMethodException {
-        Method method = getClass().getDeclaredMethod("dummyEndpoint", String.class);
-        var parameter = new MethodParameter(method, 0);
-
         var bindingResult = new BeanPropertyBindingResult(new Object(), "request");
         bindingResult.addError(new FieldError("request", field, message));
 
-        return new MethodArgumentNotValidException(parameter, bindingResult);
+        return new MethodArgumentNotValidException(dummyParameter(), bindingResult);
     }
 
     // ---------- violações de integridade ----------
@@ -179,6 +182,19 @@ class GlobalExceptionHandlerTest {
                 .containsExactly(
                         org.assertj.core.groups.Tuple.tuple(
                                 "quantityDelta", "A variação não pode ser zero."));
+    }
+
+    @Test
+    void parametroComTipoInvalidoVira400() throws Exception {
+        var exception = new MethodArgumentTypeMismatchException(
+                "talvez", Boolean.class, "active", dummyParameter(), null);
+
+        var response = handler.handleTypeMismatch(exception, request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(400);
+        assertThat(response.getBody().message())
+                .isEqualTo("Valor inválido para o parâmetro 'active'.");
+        assertThat(response.getBody().fieldErrors()).isEmpty();
     }
 
     // ---------- segurança e erros inesperados ----------
