@@ -73,6 +73,19 @@ class GlobalExceptionHandlerTest {
     }
 
     @Test
+    void constraintDeNomeDeProdutoVira409ComCampoName() {
+        var response = handler.handleDataIntegrity(
+                violation("uq_products_coffee_shop_name"), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().message())
+                .isEqualTo("Já existe um produto com este nome.");
+        assertThat(response.getBody().fieldErrors())
+                .extracting(ApiError.FieldViolation::field)
+                .containsExactly("name");
+    }
+
+    @Test
     void constraintDeEstornoDuplicadoVira409() {
         var response = handler.handleDataIntegrity(
                 violation("uq_stock_movements_reverses_movement"), request);
