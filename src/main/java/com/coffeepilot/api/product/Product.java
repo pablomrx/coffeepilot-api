@@ -152,6 +152,10 @@ public class Product {
         this.active = false;
     }
 
+    public void touch() {
+        this.updatedAt = OffsetDateTime.now();
+    }
+
     public Long getId() {
         return id;
     }
