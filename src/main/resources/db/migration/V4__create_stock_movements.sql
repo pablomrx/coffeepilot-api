@@ -16,6 +16,8 @@ CREATE TABLE stock_movements (
 
     reverses_movement_id BIGINT,
 
+    order_id BIGINT,
+
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT fk_stock_movements_coffee_shop
@@ -27,8 +29,8 @@ CREATE TABLE stock_movements (
         REFERENCES ingredients (id, coffee_shop_id),
 
     CONSTRAINT fk_stock_movements_created_by
-        FOREIGN KEY (created_by)
-        REFERENCES users (id),
+        FOREIGN KEY (created_by, coffee_shop_id)
+        REFERENCES users (id, coffee_shop_id),
 
     CONSTRAINT fk_stock_movements_reverses_movement
         FOREIGN KEY (reverses_movement_id, coffee_shop_id)
@@ -132,6 +134,19 @@ CREATE TABLE stock_movements (
             OR reverses_movement_id <> id
         ),
 
+    CONSTRAINT ck_stock_movements_order_reference
+        CHECK (
+            (
+                type = 'CONSUMPTION'
+                AND order_id IS NOT NULL
+            )
+            OR (
+                type IN ('INITIAL', 'ENTRY', 'ADJUSTMENT')
+                AND order_id IS NULL
+            )
+            OR type = 'REVERSAL'
+        ),
+
     CONSTRAINT uq_stock_movements_id_coffee_shop
         UNIQUE (id, coffee_shop_id)
 );
@@ -143,6 +158,10 @@ CREATE UNIQUE INDEX uq_stock_movements_reverses_movement
 CREATE UNIQUE INDEX uq_stock_movements_initial_per_ingredient
     ON stock_movements (ingredient_id)
     WHERE type = 'INITIAL';
+
+CREATE UNIQUE INDEX uq_stock_movements_consumption_per_order_ingredient
+    ON stock_movements (order_id, ingredient_id)
+    WHERE type = 'CONSUMPTION';
 
 CREATE INDEX idx_stock_movements_ingredient_history
     ON stock_movements (
@@ -158,3 +177,7 @@ CREATE INDEX idx_stock_movements_coffee_shop_date
         created_at DESC,
         id DESC
     );
+
+CREATE INDEX idx_stock_movements_order
+    ON stock_movements (coffee_shop_id, order_id)
+    WHERE order_id IS NOT NULL;
