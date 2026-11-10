@@ -30,7 +30,10 @@ CREATE TABLE users (
         CHECK (role IN ('OWNER', 'MANAGER', 'ATTENDANT', 'STOCKIST')),
 
     CONSTRAINT uq_users_email
-        UNIQUE (email)
+        UNIQUE (email),
+
+    CONSTRAINT uq_users_id_coffee_shop
+        UNIQUE (id, coffee_shop_id)
 );
 
 CREATE INDEX idx_users_coffee_shop_id
