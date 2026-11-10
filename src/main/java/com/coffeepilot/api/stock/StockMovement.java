@@ -83,6 +83,9 @@ public class StockMovement {
     @JoinColumn(name = "reverses_movement_id", updatable = false)
     private StockMovement reversesMovement;
 
+    @Column(name = "order_id", updatable = false)
+    private Long orderId;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -100,6 +103,32 @@ public class StockMovement {
             String description,
             User createdBy,
             StockMovement reversesMovement
+    ) {
+        this(
+                coffeeShop,
+                ingredient,
+                type,
+                quantityDelta,
+                balanceAfter,
+                reason,
+                description,
+                createdBy,
+                reversesMovement,
+                null
+        );
+    }
+
+    public StockMovement(
+            CoffeeShop coffeeShop,
+            Ingredient ingredient,
+            StockMovementType type,
+            BigDecimal quantityDelta,
+            BigDecimal balanceAfter,
+            StockAdjustmentReason reason,
+            String description,
+            User createdBy,
+            StockMovement reversesMovement,
+            Long orderId
     ) {
         Objects.requireNonNull(
                 coffeeShop,
@@ -138,6 +167,12 @@ public class StockMovement {
             );
         }
 
+        if (orderId != null && orderId <= 0) {
+            throw new IllegalArgumentException(
+                    "Order id must be positive."
+            );
+        }
+
         this.coffeeShop = coffeeShop;
         this.ingredient = ingredient;
         this.type = type;
@@ -145,6 +180,7 @@ public class StockMovement {
         this.reason = reason;
         this.description = normalizeDescription(description);
         this.reversesMovement = reversesMovement;
+        this.orderId = orderId;
 
         this.quantityDelta = validateAmount(
                 quantityDelta,
@@ -284,6 +320,8 @@ public class StockMovement {
             );
         }
 
+        validateOrderReference();
+
         if (type == StockMovementType.REVERSAL) {
 
             if (reversesMovement == null) {
@@ -304,6 +342,25 @@ public class StockMovement {
 
             throw new IllegalArgumentException(
                     "Only reversal movements can reference another movement."
+            );
+        }
+    }
+
+    private void validateOrderReference() {
+
+        if (type == StockMovementType.CONSUMPTION && orderId == null) {
+            throw new IllegalArgumentException(
+                    "Consumption movements must reference an order."
+            );
+        }
+
+        if ((type == StockMovementType.INITIAL
+                || type == StockMovementType.ENTRY
+                || type == StockMovementType.ADJUSTMENT)
+                && orderId != null) {
+
+            throw new IllegalArgumentException(
+                    "Only consumption and reversal movements can reference an order."
             );
         }
     }
@@ -337,6 +394,12 @@ public class StockMovement {
         )) {
             throw new IllegalArgumentException(
                     "Reversal and original movement must belong to the same coffee shop."
+            );
+        }
+
+        if (!Objects.equals(orderId, reversesMovement.getOrderId())) {
+            throw new IllegalArgumentException(
+                    "Reversal must reference the same order as the original movement."
             );
         }
 
@@ -387,6 +450,10 @@ public class StockMovement {
 
     public StockMovement getReversesMovement() {
         return reversesMovement;
+    }
+
+    public Long getOrderId() {
+        return orderId;
     }
 
     public OffsetDateTime getCreatedAt() {
