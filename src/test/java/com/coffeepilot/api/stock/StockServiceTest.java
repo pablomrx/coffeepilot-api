@@ -2,15 +2,22 @@ package com.coffeepilot.api.stock;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.times;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.LinkedHashMap;
+import java.util.List;
+import java.util.Map;
 import java.util.Optional;
 
 import org.junit.jupiter.api.BeforeEach;
@@ -21,6 +28,7 @@ import org.junit.jupiter.params.provider.EnumSource;
 import org.junit.jupiter.params.provider.NullAndEmptySource;
 import org.junit.jupiter.params.provider.ValueSource;
 import org.mockito.ArgumentCaptor;
+import org.mockito.Captor;
 import org.mockito.Mock;
 import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.data.domain.Page;
@@ -33,6 +41,9 @@ import org.springframework.test.util.ReflectionTestUtils;
 import com.coffeepilot.api.coffeeshop.CoffeeShop;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
+import com.coffeepilot.api.common.exception.InsufficientStockException;
+import com.coffeepilot.api.common.exception.InsufficientStockException.Reason;
+import com.coffeepilot.api.common.exception.InsufficientStockException.StockIssue;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
 import com.coffeepilot.api.ingredient.Ingredient;
 import com.coffeepilot.api.ingredient.IngredientRepository;
@@ -49,10 +60,13 @@ class StockServiceTest {
     private static final Long USER_ID = 1L;
     private static final Long COFFEE_SHOP_ID = 10L;
     private static final Long INGREDIENT_ID = 1L;
+    private static final Long ORDER_ID = 55L;
 
     @Mock UserRepository userRepository;
     @Mock IngredientRepository ingredientRepository;
     @Mock StockMovementRepository movementRepository;
+
+    @Captor ArgumentCaptor<Collection<Long>> idsCaptor;
 
     private StockService service;
     private CoffeeShop shop;
@@ -90,9 +104,14 @@ class StockServiceTest {
     }
 
     private Ingredient ingredient(IngredientUnit unit, String balance) {
+        return ingredientWithId(INGREDIENT_ID, "Café", unit, balance);
+    }
+
+    private Ingredient ingredientWithId(
+            Long id, String name, IngredientUnit unit, String balance) {
         Ingredient ingredient =
-                new Ingredient(COFFEE_SHOP_ID, "Café", unit, BigDecimal.ZERO);
-        ReflectionTestUtils.setField(ingredient, "id", INGREDIENT_ID);
+                new Ingredient(COFFEE_SHOP_ID, name, unit, BigDecimal.ZERO);
+        ReflectionTestUtils.setField(ingredient, "id", id);
 
         BigDecimal value = new BigDecimal(balance);
         if (value.signum() > 0) {
@@ -107,6 +126,12 @@ class StockServiceTest {
                 .thenReturn(Optional.of(ingredient));
     }
 
+    private void lockMany(List<Ingredient> ingredients) {
+        when(ingredientRepository.findAllByIdsForUpdate(
+                eq(COFFEE_SHOP_ID), any()))
+                .thenReturn(ingredients);
+    }
+
     private void saveEchoesArgument() {
         when(movementRepository.saveAndFlush(any(StockMovement.class)))
                 .thenAnswer(inv -> inv.getArgument(0));
@@ -117,6 +142,13 @@ class StockServiceTest {
                 ArgumentCaptor.forClass(StockMovement.class);
         verify(movementRepository).saveAndFlush(captor.capture());
         return captor.getValue();
+    }
+
+    private List<StockMovement> savedMovements(int times) {
+        ArgumentCaptor<StockMovement> captor =
+                ArgumentCaptor.forClass(StockMovement.class);
+        verify(movementRepository, times(times)).saveAndFlush(captor.capture());
+        return captor.getAllValues();
     }
 
     private StockMovement persistedMovement(
@@ -132,6 +164,34 @@ class StockServiceTest {
                 null, null, actor, null);
         ReflectionTestUtils.setField(movement, "id", id);
         return movement;
+    }
+
+    private StockMovement consumption(
+            Long id,
+            Ingredient ingredient,
+            String delta,
+            String balanceAfter,
+            Long orderId
+    ) {
+        StockMovement movement = new StockMovement(
+                shop, ingredient, StockMovementType.CONSUMPTION,
+                new BigDecimal(delta), new BigDecimal(balanceAfter),
+                null, "Pedido", actor, null, orderId);
+        ReflectionTestUtils.setField(movement, "id", id);
+        return movement;
+    }
+
+    /** Monta o consumo por ingrediente: required(1L, "30", 2L, "150.5"). */
+    private Map<Long, BigDecimal> required(Object... idsAndQuantities) {
+        Map<Long, BigDecimal> map = new LinkedHashMap<>();
+
+        for (int i = 0; i < idsAndQuantities.length; i += 2) {
+            map.put(
+                    (Long) idsAndQuantities[i],
+                    new BigDecimal((String) idsAndQuantities[i + 1]));
+        }
+
+        return map;
     }
 
     // ---------- entrada ----------
@@ -176,6 +236,7 @@ class StockServiceTest {
         assertThat(saved.getBalanceAfter()).isEqualByComparingTo("1250.5");
         assertThat(saved.getDescription()).isEqualTo("Compra");
         assertThat(saved.getCreatedBy()).isSameAs(actor);
+        assertThat(saved.getOrderId()).isNull();
         assertThat(ingredient.getCurrentQuantity())
                 .isEqualByComparingTo(saved.getBalanceAfter());
     }
@@ -400,6 +461,7 @@ class StockServiceTest {
         assertThat(saved.getQuantityDelta()).isEqualByComparingTo("-500");
         assertThat(saved.getBalanceAfter()).isEqualByComparingTo("1000");
         assertThat(saved.getDescription()).isEqualTo("Entrada em duplicidade");
+        assertThat(saved.getOrderId()).isNull();
         assertThat(ingredient.getCurrentQuantity()).isEqualByComparingTo("1000");
     }
 
@@ -453,6 +515,24 @@ class StockServiceTest {
         assertThatThrownBy(() -> service.reverse(auth(), 1L, "Motivo"))
                 .isInstanceOf(BusinessRuleException.class);
 
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void estornoManualDeConsumoDePedidoEhRejeitado() {
+        actingAs(Role.OWNER);
+        StockMovement consumption = mock(StockMovement.class);
+        when(consumption.getType()).thenReturn(StockMovementType.CONSUMPTION);
+        when(movementRepository.findByIdAndCoffeeShopId(8L, COFFEE_SHOP_ID))
+                .thenReturn(Optional.of(consumption));
+
+        assertThatThrownBy(() -> service.reverse(auth(), 8L, "Motivo"))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Movimentações de consumo de pedidos não podem "
+                        + "ser estornadas manualmente. Cancele o pedido.");
+
+        verify(ingredientRepository, never())
+                .findByIdAndCoffeeShopIdForUpdate(any(), any());
         verify(movementRepository, never()).saveAndFlush(any());
     }
 
@@ -538,6 +618,7 @@ class StockServiceTest {
         assertThat(saved.getQuantityDelta()).isEqualByComparingTo("500");
         assertThat(saved.getBalanceAfter()).isEqualByComparingTo("500");
         assertThat(saved.getDescription()).isNull();
+        assertThat(saved.getOrderId()).isNull();
         assertThat(ingredient.getCurrentQuantity()).isEqualByComparingTo("500");
     }
 
@@ -573,6 +654,344 @@ class StockServiceTest {
         assertThatThrownBy(() -> service.registerInitial(
                 actor, ingredient, new BigDecimal("2.5")))
                 .isInstanceOf(BusinessRuleException.class);
+    }
+
+    // ---------- consumo por pedido ----------
+
+    @Test
+    void consumoBaixaCadaIngredienteERegistraMovimentacoesDoPedido() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "1000");
+        Ingredient leite = ingredientWithId(2L, "Leite", IngredientUnit.ML, "500");
+        lockMany(List.of(cafe, leite));
+        saveEchoesArgument();
+
+        List<StockMovement> result = service.consumeForOrder(
+                actor, ORDER_ID, "Pedido nº 12",
+                required(1L, "30", 2L, "150.5"));
+
+        assertThat(result).hasSize(2);
+
+        List<StockMovement> saved = savedMovements(2);
+
+        assertThat(saved).allSatisfy(movement -> {
+            assertThat(movement.getType()).isEqualTo(StockMovementType.CONSUMPTION);
+            assertThat(movement.getOrderId()).isEqualTo(ORDER_ID);
+            assertThat(movement.getDescription()).isEqualTo("Pedido nº 12");
+            assertThat(movement.getCreatedBy()).isSameAs(actor);
+            assertThat(movement.getReversesMovement()).isNull();
+        });
+
+        assertThat(saved.get(0).getIngredient().getId()).isEqualTo(1L);
+        assertThat(saved.get(0).getQuantityDelta()).isEqualByComparingTo("-30");
+        assertThat(saved.get(0).getBalanceAfter()).isEqualByComparingTo("970");
+        assertThat(saved.get(1).getIngredient().getId()).isEqualTo(2L);
+        assertThat(saved.get(1).getQuantityDelta()).isEqualByComparingTo("-150.5");
+        assertThat(saved.get(1).getBalanceAfter()).isEqualByComparingTo("349.5");
+
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("970");
+        assertThat(leite.getCurrentQuantity()).isEqualByComparingTo("349.5");
+    }
+
+    @Test
+    void consumoSemIngredientesNaoFazNada() {
+        List<StockMovement> result = service.consumeForOrder(
+                actor, ORDER_ID, "Pedido nº 12", Map.of());
+
+        assertThat(result).isEmpty();
+        verifyNoInteractions(ingredientRepository, movementRepository);
+    }
+
+    @Test
+    void consumoBloqueiaIngredientesEmOrdemCrescenteDeId() {
+        Ingredient primeiro = ingredientWithId(1L, "Café", IngredientUnit.G, "100");
+        Ingredient terceiro = ingredientWithId(3L, "Leite", IngredientUnit.ML, "100");
+        lockMany(List.of(primeiro, terceiro));
+        saveEchoesArgument();
+
+        service.consumeForOrder(
+                actor, ORDER_ID, null, required(3L, "1", 1L, "1"));
+
+        verify(ingredientRepository).findAllByIdsForUpdate(
+                eq(COFFEE_SHOP_ID), idsCaptor.capture());
+        assertThat(idsCaptor.getValue()).containsExactly(1L, 3L);
+
+        assertThat(savedMovements(2))
+                .extracting(movement -> movement.getIngredient().getId())
+                .containsExactly(1L, 3L);
+    }
+
+    @Test
+    void consumoPodeZerarOSaldoDoIngrediente() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "30");
+        lockMany(List.of(cafe));
+        saveEchoesArgument();
+
+        service.consumeForOrder(actor, ORDER_ID, null, required(1L, "30"));
+
+        assertThat(savedMovement().getBalanceAfter()).isEqualByComparingTo("0");
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("0");
+    }
+
+    @Test
+    void consumoInteiroEmIngredienteUnitEhAceito() {
+        Ingredient ovo = ingredientWithId(1L, "Ovo", IngredientUnit.UNIT, "10");
+        lockMany(List.of(ovo));
+        saveEchoesArgument();
+
+        service.consumeForOrder(actor, ORDER_ID, null, required(1L, "4"));
+
+        assertThat(ovo.getCurrentQuantity()).isEqualByComparingTo("6");
+    }
+
+    @Test
+    void faltaDeSaldoListaTodosOsIngredientesComProblemaESemBaixarNada() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "100");
+        Ingredient leite = ingredientWithId(2L, "Leite", IngredientUnit.ML, "50");
+        Ingredient acucar = ingredientWithId(3L, "Açúcar", IngredientUnit.G, "500");
+        lockMany(List.of(cafe, leite, acucar));
+
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null,
+                required(1L, "150", 2L, "80", 3L, "10")))
+                .isInstanceOfSatisfying(InsufficientStockException.class, ex -> {
+                    assertThat(ex.getIssues())
+                            .extracting(StockIssue::ingredientId, StockIssue::reason)
+                            .containsExactly(
+                                    tuple(1L, Reason.INSUFFICIENT_STOCK),
+                                    tuple(2L, Reason.INSUFFICIENT_STOCK));
+
+                    StockIssue first = ex.getIssues().get(0);
+                    assertThat(first.ingredientName()).isEqualTo("Café");
+                    assertThat(first.unit()).isEqualTo("G");
+                    assertThat(first.required()).isEqualByComparingTo("150");
+                    assertThat(first.available()).isEqualByComparingTo("100");
+                });
+
+        verify(movementRepository, never()).saveAndFlush(any());
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("100");
+        assertThat(leite.getCurrentQuantity()).isEqualByComparingTo("50");
+        assertThat(acucar.getCurrentQuantity()).isEqualByComparingTo("500");
+    }
+
+    @Test
+    void ingredienteInativoEhInformadoESemBaixarNada() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "1000");
+        cafe.deactivate();
+        lockMany(List.of(cafe));
+
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null, required(1L, "10")))
+                .isInstanceOfSatisfying(InsufficientStockException.class, ex ->
+                        assertThat(ex.getIssues())
+                                .extracting(StockIssue::ingredientId, StockIssue::reason)
+                                .containsExactly(
+                                        tuple(1L, Reason.INACTIVE_INGREDIENT)));
+
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void ingredienteInativoEOutroSemSaldoSaoListadosJuntos() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "1000");
+        cafe.deactivate();
+        Ingredient leite = ingredientWithId(2L, "Leite", IngredientUnit.ML, "10");
+        lockMany(List.of(cafe, leite));
+
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null, required(1L, "10", 2L, "20")))
+                .isInstanceOfSatisfying(InsufficientStockException.class, ex ->
+                        assertThat(ex.getIssues())
+                                .extracting(StockIssue::ingredientId, StockIssue::reason)
+                                .containsExactly(
+                                        tuple(1L, Reason.INACTIVE_INGREDIENT),
+                                        tuple(2L, Reason.INSUFFICIENT_STOCK)));
+
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void consumoAcimaDoMaximoEhRejeitadoAntesDeBloquearIngredientes() {
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null, required(1L, "100000000000")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("O consumo de ingredientes do pedido excede "
+                        + "o valor máximo permitido.");
+
+        verify(ingredientRepository, never()).findAllByIdsForUpdate(any(), any());
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = {"0", "-1"})
+    void consumoZeroOuNegativoEhRejeitadoAntesDeBloquearIngredientes(String value) {
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null, required(1L, value)))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("O consumo calculado para o pedido é inválido.");
+
+        verify(ingredientRepository, never()).findAllByIdsForUpdate(any(), any());
+    }
+
+    @Test
+    void ingredienteInexistenteNoConsumoEhRejeitado() {
+        lockMany(List.of());
+
+        assertThatThrownBy(() -> service.consumeForOrder(
+                actor, ORDER_ID, null, required(1L, "5")))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("Ingrediente da receita não encontrado.");
+
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    // ---------- estorno interno do consumo de um pedido ----------
+
+    @Test
+    void cancelamentoDevolveExatamenteOQueOPedidoConsumiu() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "70");
+        StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
+
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(
+                        new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
+        lockMany(List.of(cafe));
+        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(consumo));
+        saveEchoesArgument();
+
+        List<StockMovement> result = service.reverseOrderConsumption(
+                actor, ORDER_ID, "Cancelamento do pedido nº 12");
+
+        assertThat(result).hasSize(1);
+
+        StockMovement saved = savedMovement();
+        assertThat(saved.getType()).isEqualTo(StockMovementType.REVERSAL);
+        assertThat(saved.getReversesMovement()).isSameAs(consumo);
+        assertThat(saved.getQuantityDelta()).isEqualByComparingTo("30");
+        assertThat(saved.getBalanceAfter()).isEqualByComparingTo("100");
+        assertThat(saved.getOrderId()).isEqualTo(ORDER_ID);
+        assertThat(saved.getDescription()).isEqualTo("Cancelamento do pedido nº 12");
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("100");
+    }
+
+    @Test
+    void cancelamentoDevolveEstoqueMesmoComIngredienteInativo() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "70");
+        StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
+        cafe.deactivate();
+
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(
+                        new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
+        lockMany(List.of(cafe));
+        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(consumo));
+        saveEchoesArgument();
+
+        service.reverseOrderConsumption(actor, ORDER_ID, "Cancelamento do pedido");
+
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("100");
+        assertThat(savedMovement().getType()).isEqualTo(StockMovementType.REVERSAL);
+    }
+
+    @Test
+    void cancelamentoDeVariosIngredientesBloqueiaEmOrdemEEstornaCadaUm() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "70");
+        Ingredient leite = ingredientWithId(2L, "Leite", IngredientUnit.ML, "350");
+        StockMovement consumoCafe = consumption(10L, cafe, "-30", "70", ORDER_ID);
+        StockMovement consumoLeite = consumption(11L, leite, "-150", "350", ORDER_ID);
+
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(
+                        new StockConsumptionLine(10L, 1L, new BigDecimal("-30")),
+                        new StockConsumptionLine(11L, 2L, new BigDecimal("-150"))));
+        lockMany(List.of(cafe, leite));
+        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(consumoCafe, consumoLeite));
+        saveEchoesArgument();
+
+        service.reverseOrderConsumption(actor, ORDER_ID, "Cancelamento do pedido");
+
+        verify(ingredientRepository).findAllByIdsForUpdate(
+                eq(COFFEE_SHOP_ID), idsCaptor.capture());
+        assertThat(idsCaptor.getValue()).containsExactly(1L, 2L);
+
+        List<StockMovement> saved = savedMovements(2);
+        assertThat(saved)
+                .extracting(movement -> movement.getIngredient().getId())
+                .containsExactly(1L, 2L);
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("100");
+        assertThat(leite.getCurrentQuantity()).isEqualByComparingTo("500");
+    }
+
+    @Test
+    void cancelamentoDePedidoSemConsumoNaoFazNada() {
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of());
+
+        List<StockMovement> result = service.reverseOrderConsumption(
+                actor, ORDER_ID, "Cancelamento do pedido");
+
+        assertThat(result).isEmpty();
+        verify(ingredientRepository, never()).findAllByIdsForUpdate(any(), any());
+        verify(movementRepository, never()).saveAndFlush(any());
+    }
+
+    @Test
+    void cancelamentoNaoRepeteOEstornoDeUmConsumoJaEstornado() {
+        Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "100");
+        StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
+
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(
+                        new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
+        lockMany(List.of(cafe));
+        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(consumo));
+        when(movementRepository.existsByReversesMovementIdAndCoffeeShopId(
+                10L, COFFEE_SHOP_ID)).thenReturn(true);
+
+        assertThatThrownBy(() -> service.reverseOrderConsumption(
+                actor, ORDER_ID, "Cancelamento do pedido"))
+                .isInstanceOf(BusinessConflictException.class)
+                .hasMessage("O consumo deste pedido já foi estornado.");
+
+        verify(movementRepository, never()).saveAndFlush(any());
+        assertThat(cafe.getCurrentQuantity()).isEqualByComparingTo("100");
+    }
+
+    @ParameterizedTest
+    @NullAndEmptySource
+    @ValueSource(strings = {"   "})
+    void cancelamentoSemJustificativaEhRejeitadoAntesDeConsultarOBanco(
+            String description) {
+        assertThatThrownBy(() -> service.reverseOrderConsumption(
+                actor, ORDER_ID, description))
+                .isInstanceOf(BusinessRuleException.class)
+                .hasMessage("A justificativa do estorno é obrigatória.");
+
+        verifyNoInteractions(ingredientRepository, movementRepository);
+    }
+
+    @Test
+    void estornoQueEstourariaOLimiteDoSaldoEhRejeitado() {
+        Ingredient cafe = ingredientWithId(
+                1L, "Café", IngredientUnit.G, "99999999999");
+        StockMovement consumo = consumption(
+                10L, cafe, "-30", "99999999999", ORDER_ID);
+
+        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(
+                        new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
+        lockMany(List.of(cafe));
+        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+                .thenReturn(List.of(consumo));
+
+        assertThatThrownBy(() -> service.reverseOrderConsumption(
+                actor, ORDER_ID, "Cancelamento do pedido"))
+                .isInstanceOf(BusinessRuleException.class);
+
+        verify(movementRepository, never()).saveAndFlush(any());
     }
 
     // ---------- histórico ----------
