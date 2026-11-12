@@ -2,6 +2,9 @@ package com.coffeepilot.api.stock;
 
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
+import com.coffeepilot.api.common.exception.InsufficientStockException;
+import com.coffeepilot.api.common.exception.InsufficientStockException.Reason;
+import com.coffeepilot.api.common.exception.InsufficientStockException.StockIssue;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
 import com.coffeepilot.api.ingredient.Ingredient;
 import com.coffeepilot.api.ingredient.IngredientRepository;
@@ -20,6 +23,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+import java.util.Objects;
 
 @Service
 public class StockService {
@@ -187,8 +195,13 @@ public class StockService {
             );
         }
 
-        // Bloqueia o ingrediente antes de verificar o estorno.
-        // Ingredientes inativos não podem receber movimentações.
+        if (original.getType() == StockMovementType.CONSUMPTION) {
+            throw new BusinessRuleException(
+                    "Movimentações de consumo de pedidos não podem ser "
+                            + "estornadas manualmente. Cancele o pedido."
+            );
+        }
+
         Ingredient ingredient = lockActiveIngredient(
                 actor,
                 original.getIngredient().getId()
@@ -244,9 +257,6 @@ public class StockService {
         );
     }
 
-    // Chamado pelo IngredientService dentro da transação do cadastro.
-    // O ingrediente deve estar salvo e possuir ID.
-    // O chamador já validou as permissões.
     @Transactional
     public StockMovement registerInitial(
             User actor,
@@ -265,8 +275,6 @@ public class StockService {
             );
         }
 
-        // Regra: estoque inicial só pode ser registrado
-        // se o ingrediente ainda não possui movimentações.
         if (movementRepository
                 .existsByIngredientIdAndCoffeeShopId(
                         ingredient.getId(),
@@ -285,6 +293,221 @@ public class StockService {
                 null,
                 null,
                 null
+        );
+    }
+
+    @Transactional
+    public List<StockMovement> consumeForOrder(
+            User actor,
+            Long orderId,
+            String description,
+            Map<Long, BigDecimal> requiredByIngredient
+    ) {
+        Objects.requireNonNull(actor, "actor is required");
+        Objects.requireNonNull(orderId, "orderId is required");
+        Objects.requireNonNull(
+                requiredByIngredient,
+                "requiredByIngredient is required"
+        );
+
+        if (requiredByIngredient.isEmpty()) {
+            return List.of();
+        }
+
+        for (Map.Entry<Long, BigDecimal> entry
+                : requiredByIngredient.entrySet()) {
+
+            BigDecimal required = entry.getValue();
+
+            if (entry.getKey() == null
+                    || required == null
+                    || required.signum() <= 0) {
+                throw new BusinessRuleException(
+                        "O consumo calculado para o pedido é inválido."
+                );
+            }
+
+            if (required.stripTrailingZeros().scale() > QUANTITY_SCALE
+                    || required.compareTo(MAX_QUANTITY) > 0) {
+                throw new BusinessRuleException(
+                        "O consumo de ingredientes do pedido excede "
+                                + "o valor máximo permitido."
+                );
+            }
+        }
+
+        Long coffeeShopId = actor.getCoffeeShop().getId();
+
+        List<Long> ids = requiredByIngredient.keySet().stream()
+                .sorted()
+                .toList();
+
+        List<Ingredient> locked =
+                ingredientRepository.findAllByIdsForUpdate(coffeeShopId, ids);
+
+        if (locked.size() != ids.size()) {
+            throw new BusinessRuleException(
+                    "Ingrediente da receita não encontrado."
+            );
+        }
+
+        Map<Long, Ingredient> byId = new HashMap<>();
+
+        for (Ingredient ingredient : locked) {
+            byId.put(ingredient.getId(), ingredient);
+        }
+
+        List<StockIssue> issues = new ArrayList<>();
+
+        for (Long id : ids) {
+            Ingredient ingredient = byId.get(id);
+            BigDecimal required = requiredByIngredient.get(id);
+            BigDecimal available = ingredient.getCurrentQuantity();
+
+            if (!ingredient.isActive()) {
+                issues.add(issue(
+                        ingredient,
+                        required,
+                        available,
+                        Reason.INACTIVE_INGREDIENT
+                ));
+            } else if (available.compareTo(required) < 0) {
+                issues.add(issue(
+                        ingredient,
+                        required,
+                        available,
+                        Reason.INSUFFICIENT_STOCK
+                ));
+            }
+        }
+
+        if (!issues.isEmpty()) {
+            throw new InsufficientStockException(issues);
+        }
+
+        List<StockMovement> movements = new ArrayList<>();
+
+        for (Long id : ids) {
+            movements.add(apply(
+                    actor,
+                    byId.get(id),
+                    StockMovementType.CONSUMPTION,
+                    requiredByIngredient.get(id).negate(),
+                    null,
+                    description,
+                    null,
+                    orderId
+            ));
+        }
+
+        return movements;
+    }
+
+    @Transactional
+    public List<StockMovement> reverseOrderConsumption(
+            User actor,
+            Long orderId,
+            String description
+    ) {
+        Objects.requireNonNull(actor, "actor is required");
+        Objects.requireNonNull(orderId, "orderId is required");
+
+        if (description == null || description.isBlank()) {
+            throw new BusinessRuleException(
+                    "A justificativa do estorno é obrigatória."
+            );
+        }
+
+        Long coffeeShopId = actor.getCoffeeShop().getId();
+
+        List<StockConsumptionLine> lines = movementRepository
+                .findConsumptionLinesByOrder(coffeeShopId, orderId);
+
+        if (lines.isEmpty()) {
+            return List.of();
+        }
+
+        List<Long> ids = lines.stream()
+                .map(StockConsumptionLine::ingredientId)
+                .distinct()
+                .sorted()
+                .toList();
+
+        List<Ingredient> locked =
+                ingredientRepository.findAllByIdsForUpdate(coffeeShopId, ids);
+
+        if (locked.size() != ids.size()) {
+            throw new BusinessRuleException(
+                    "Ingrediente do pedido não encontrado."
+            );
+        }
+
+        Map<Long, Ingredient> ingredientsById = new HashMap<>();
+
+        for (Ingredient ingredient : locked) {
+            ingredientsById.put(ingredient.getId(), ingredient);
+        }
+
+        Map<Long, Long> ingredientIdByMovement = new HashMap<>();
+
+        for (StockConsumptionLine line : lines) {
+            ingredientIdByMovement.put(line.movementId(), line.ingredientId());
+        }
+
+        List<StockMovement> consumptions = movementRepository
+                .findConsumptionsByOrder(coffeeShopId, orderId);
+
+        List<StockMovement> reversals = new ArrayList<>();
+
+        for (StockMovement consumption : consumptions) {
+            if (movementRepository
+                    .existsByReversesMovementIdAndCoffeeShopId(
+                            consumption.getId(),
+                            coffeeShopId
+                    )) {
+                throw new BusinessConflictException(
+                        "O consumo deste pedido já foi estornado."
+                );
+            }
+
+            Ingredient ingredient = ingredientsById.get(
+                    ingredientIdByMovement.get(consumption.getId())
+            );
+
+            if (ingredient == null) {
+                throw new BusinessRuleException(
+                        "Ingrediente do pedido não encontrado."
+                );
+            }
+
+            reversals.add(apply(
+                    actor,
+                    ingredient,
+                    StockMovementType.REVERSAL,
+                    consumption.getQuantityDelta().negate(),
+                    null,
+                    description,
+                    consumption,
+                    consumption.getOrderId()
+            ));
+        }
+
+        return reversals;
+    }
+
+    private StockIssue issue(
+            Ingredient ingredient,
+            BigDecimal required,
+            BigDecimal available,
+            Reason reason
+    ) {
+        return new StockIssue(
+                ingredient.getId(),
+                ingredient.getName(),
+                ingredient.getUnit().name(),
+                required,
+                available,
+                reason
         );
     }
 
@@ -310,8 +533,6 @@ public class StockService {
         return ingredient;
     }
 
-    // A query define a ordenação.
-    // O service limita o tamanho da página.
     private Pageable sanitize(Pageable pageable) {
         if (pageable == null || pageable.isUnpaged()) {
             return PageRequest.of(
@@ -375,9 +596,6 @@ public class StockService {
         }
     }
 
-    // Único ponto que altera o saldo.
-    // Registra a movimentação e atualiza o ingrediente
-    // na mesma transação.
     private StockMovement apply(
             User actor,
             Ingredient ingredient,
@@ -386,6 +604,28 @@ public class StockService {
             StockAdjustmentReason reason,
             String description,
             StockMovement reverses
+    ) {
+        return apply(
+                actor,
+                ingredient,
+                type,
+                delta,
+                reason,
+                description,
+                reverses,
+                null
+        );
+    }
+
+    private StockMovement apply(
+            User actor,
+            Ingredient ingredient,
+            StockMovementType type,
+            BigDecimal delta,
+            StockAdjustmentReason reason,
+            String description,
+            StockMovement reverses,
+            Long orderId
     ) {
         BigDecimal newBalance =
                 ingredient.getCurrentQuantity().add(delta);
@@ -416,7 +656,8 @@ public class StockService {
                     reason,
                     description,
                     actor,
-                    reverses
+                    reverses,
+                    orderId
             );
         } catch (IllegalArgumentException ex) {
             log.warn(
