@@ -79,6 +79,26 @@ public class GlobalExceptionHandler {
         );
     }
 
+    @ExceptionHandler(InsufficientStockException.class)
+    public ResponseEntity<InsufficientStockResponse> handleInsufficientStock(
+            InsufficientStockException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.CONFLICT;
+
+        InsufficientStockResponse body = new InsufficientStockResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of(),
+                ex.getIssues()
+        );
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiError> handleBusinessRule(
             BusinessRuleException ex,
