@@ -9,6 +9,8 @@ import org.springframework.data.jpa.repository.Lock;
 import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
+import java.util.Collection;
+import java.util.List;
 import java.util.Optional;
 
 public interface ProductRepository extends JpaRepository<Product, Long> {
@@ -29,6 +31,21 @@ public interface ProductRepository extends JpaRepository<Product, Long> {
     Optional<Product> findByIdAndCoffeeShopIdForUpdate(
             @Param("id") Long id,
             @Param("coffeeShopId") Long coffeeShopId
+    );
+
+    // Busca e bloqueia vários produtos para leitura, em ordem crescente
+    // de id. Usado pelo pedido: edições de produto e receita esperam o
+    // pedido terminar, e pedidos simultâneos não se bloqueiam entre si.
+    @Lock(LockModeType.PESSIMISTIC_READ)
+    @Query("""
+            SELECT p FROM Product p
+            WHERE p.coffeeShopId = :coffeeShopId
+              AND p.id IN :ids
+            ORDER BY p.id
+            """)
+    List<Product> findAllByIdsForShare(
+            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("ids") Collection<Long> ids
     );
 
     // Verifica se já existe um produto com o mesmo nome na cafeteria.
