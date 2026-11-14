@@ -33,8 +33,8 @@ public class RecipeItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "coffee_shop_id", nullable = false, updatable = false)
-    private Long coffeeShopId;
+    @Column(name = "establishment_id", nullable = false, updatable = false)
+    private Long establishmentId;
 
     @Column(name = "product_id", nullable = false, updatable = false)
     private Long productId;
@@ -54,28 +54,28 @@ public class RecipeItem {
     }
 
     public RecipeItem(
-            Long coffeeShopId,
+            Long establishmentId,
             Long productId,
             Ingredient ingredient,
             BigDecimal quantity
     ) {
-        Objects.requireNonNull(coffeeShopId, "coffeeShopId is required");
+        Objects.requireNonNull(establishmentId, "establishmentId is required");
         Objects.requireNonNull(productId, "productId is required");
         Objects.requireNonNull(ingredient, "ingredient is required");
 
-        if (coffeeShopId <= 0 || productId <= 0) {
+        if (establishmentId <= 0 || productId <= 0) {
             throw new IllegalArgumentException(
-                    "coffeeShopId and productId must be positive."
+                    "establishmentId and productId must be positive."
             );
         }
 
-        if (!coffeeShopId.equals(ingredient.getCoffeeShopId())) {
+        if (!establishmentId.equals(ingredient.getEstablishmentId())) {
             throw new IllegalArgumentException(
                     "Ingrediente não encontrado."
             );
         }
 
-        this.coffeeShopId = coffeeShopId;
+        this.establishmentId = establishmentId;
         this.productId = productId;
         this.ingredient = ingredient;
         this.quantity = validateQuantity(ingredient.getUnit(), quantity);
@@ -122,8 +122,8 @@ public class RecipeItem {
         return id;
     }
 
-    public Long getCoffeeShopId() {
-        return coffeeShopId;
+    public Long getEstablishmentId() {
+        return establishmentId;
     }
 
     public Long getProductId() {

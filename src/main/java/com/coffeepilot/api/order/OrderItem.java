@@ -41,8 +41,8 @@ public class OrderItem {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "coffee_shop_id", nullable = false, updatable = false)
-    private Long coffeeShopId;
+    @Column(name = "establishment_id", nullable = false, updatable = false)
+    private Long establishmentId;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "order_id", nullable = false, updatable = false)
@@ -100,7 +100,7 @@ public class OrderItem {
             );
         }
 
-        this.coffeeShopId = order.getCoffeeShopId();
+        this.establishmentId = order.getEstablishmentId();
 
         this.productName = normalizeName(productName);
         this.unitPrice = validatePrice(unitPrice);
@@ -178,8 +178,8 @@ public class OrderItem {
         return id;
     }
 
-    public Long getCoffeeShopId() {
-        return coffeeShopId;
+    public Long getEstablishmentId() {
+        return establishmentId;
     }
 
     public Order getOrder() {

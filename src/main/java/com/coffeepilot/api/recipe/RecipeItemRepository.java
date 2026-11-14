@@ -15,12 +15,12 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
     @Query("""
             SELECT r FROM RecipeItem r
             JOIN FETCH r.ingredient i
-            WHERE r.coffeeShopId = :coffeeShopId
+            WHERE r.establishmentId = :establishmentId
               AND r.productId = :productId
             ORDER BY i.name, r.id
             """)
     List<RecipeItem> findByProduct(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("productId") Long productId
     );
 
@@ -31,12 +31,12 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
             SELECT new com.coffeepilot.api.recipe.RecipeLineView(
                 r.productId, r.ingredient.id, r.quantity)
             FROM RecipeItem r
-            WHERE r.coffeeShopId = :coffeeShopId
+            WHERE r.establishmentId = :establishmentId
               AND r.productId IN :productIds
             ORDER BY r.productId, r.ingredient.id
             """)
     List<RecipeLineView> findLinesByProducts(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("productIds") Collection<Long> productIds
     );
 
@@ -49,11 +49,11 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
     @Modifying(flushAutomatically = true)
     @Query("""
             DELETE FROM RecipeItem r
-            WHERE r.coffeeShopId = :coffeeShopId
+            WHERE r.establishmentId = :establishmentId
               AND r.productId = :productId
             """)
     int deleteByProduct(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("productId") Long productId
     );
 }

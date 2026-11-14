@@ -1,8 +1,8 @@
 package com.coffeepilot.api.auth;
 
 import com.coffeepilot.api.auth.dto.RegisterRequest;
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
-import com.coffeepilot.api.coffeeshop.CoffeeShopRepository;
+import com.coffeepilot.api.establishment.Establishment;
+import com.coffeepilot.api.establishment.EstablishmentRepository;
 import com.coffeepilot.api.common.exception.EmailAlreadyUsedException;
 import com.coffeepilot.api.user.Role;
 import com.coffeepilot.api.user.User;
@@ -15,16 +15,16 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 public class RegistrationService {
 
-    private final CoffeeShopRepository coffeeShopRepository;
+    private final EstablishmentRepository establishmentRepository;
     private final UserRepository userRepository;
     private final PasswordEncoder passwordEncoder;
 
     public RegistrationService(
-            CoffeeShopRepository coffeeShopRepository,
+            EstablishmentRepository establishmentRepository,
             UserRepository userRepository,
             PasswordEncoder passwordEncoder
     ) {
-        this.coffeeShopRepository = coffeeShopRepository;
+        this.establishmentRepository = establishmentRepository;
         this.userRepository = userRepository;
         this.passwordEncoder = passwordEncoder;
     }
@@ -37,15 +37,15 @@ public class RegistrationService {
             throw new EmailAlreadyUsedException();
         }
 
-        String coffeeShopName = request.coffeeShopName().trim();
+        String establishmentName = request.establishmentName().trim();
         String ownerName = request.ownerName().trim();
         String passwordHash = passwordEncoder.encode(request.password());
 
-        CoffeeShop coffeeShop = new CoffeeShop(coffeeShopName);
-        coffeeShop = coffeeShopRepository.save(coffeeShop);
+        Establishment establishment = new Establishment(establishmentName);
+        establishment = establishmentRepository.save(establishment);
 
         User owner = new User(
-                coffeeShop,
+                establishment,
                 ownerName,
                 normalizedEmail,
                 passwordHash,

@@ -43,8 +43,8 @@ public class Order {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "coffee_shop_id", nullable = false, updatable = false)
-    private Long coffeeShopId;
+    @Column(name = "establishment_id", nullable = false, updatable = false)
+    private Long establishmentId;
 
     @Column(name = "order_number", nullable = false, updatable = false)
     private Long orderNumber;
@@ -99,23 +99,23 @@ public class Order {
     }
 
     public Order(
-            Long coffeeShopId,
+            Long establishmentId,
             Long orderNumber,
             User createdBy,
             String tableReference,
             String notes
     ) {
-        Objects.requireNonNull(coffeeShopId, "coffeeShopId is required");
+        Objects.requireNonNull(establishmentId, "establishmentId is required");
         Objects.requireNonNull(orderNumber, "orderNumber is required");
         Objects.requireNonNull(createdBy, "createdBy is required");
 
-        if (coffeeShopId <= 0 || orderNumber <= 0) {
+        if (establishmentId <= 0 || orderNumber <= 0) {
             throw new IllegalArgumentException(
-                    "coffeeShopId and orderNumber must be positive."
+                    "establishmentId and orderNumber must be positive."
             );
         }
 
-        this.coffeeShopId = coffeeShopId;
+        this.establishmentId = establishmentId;
         this.orderNumber = orderNumber;
         this.createdBy = createdBy;
         this.tableReference = normalizeOptional(
@@ -262,8 +262,8 @@ public class Order {
         return id;
     }
 
-    public Long getCoffeeShopId() {
-        return coffeeShopId;
+    public Long getEstablishmentId() {
+        return establishmentId;
     }
 
     public Long getOrderNumber() {

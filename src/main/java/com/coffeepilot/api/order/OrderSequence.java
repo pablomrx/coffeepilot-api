@@ -10,8 +10,8 @@ import jakarta.persistence.Table;
 public class OrderSequence {
 
     @Id
-    @Column(name = "coffee_shop_id")
-    private Long coffeeShopId;
+    @Column(name = "establishment_id")
+    private Long establishmentId;
 
     @Column(name = "last_number", nullable = false)
     private long lastNumber;
@@ -24,8 +24,8 @@ public class OrderSequence {
         return lastNumber;
     }
 
-    public Long getCoffeeShopId() {
-        return coffeeShopId;
+    public Long getEstablishmentId() {
+        return establishmentId;
     }
 
     public long getLastNumber() {

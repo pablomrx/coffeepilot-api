@@ -9,9 +9,9 @@ import java.nio.charset.StandardCharsets;
 
 public record RegisterRequest(
 
-        @NotBlank(message = "O nome da cafeteria é obrigatório.")
-        @Size(max = 150, message = "O nome da cafeteria deve ter no máximo 150 caracteres.")
-        String coffeeShopName,
+        @NotBlank(message = "O nome do estabelecimento é obrigatório.")
+        @Size(max = 150, message = "O nome do estabelecimento deve ter no máximo 150 caracteres.")
+        String establishmentName,
 
         @NotBlank(message = "O nome do proprietário é obrigatório.")
         @Size(max = 150, message = "O nome deve ter no máximo 150 caracteres.")
@@ -36,7 +36,7 @@ public record RegisterRequest(
 
     @Override
     public String toString() {
-        return "RegisterRequest[coffeeShopName=" + coffeeShopName
+        return "RegisterRequest[establishmentName=" + establishmentName
                 + ", ownerName=" + ownerName
                 + ", email=" + email
                 + ", password=***]";

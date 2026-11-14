@@ -56,7 +56,7 @@ public class IngredientService {
                 INGREDIENT_ROLES
         );
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         if (name == null || name.isBlank()) {
             throw new BusinessRuleException("O nome é obrigatório.");
@@ -77,7 +77,7 @@ public class IngredientService {
             );
         }
 
-        if (ingredientRepository.existsByName(coffeeShopId, name)) {
+        if (ingredientRepository.existsByName(establishmentId, name)) {
             throw new BusinessConflictException(
                     "Já existe um ingrediente com este nome."
             );
@@ -86,7 +86,7 @@ public class IngredientService {
         Ingredient ingredient;
 
         try {
-            ingredient = new Ingredient(coffeeShopId, name, unit, minimum);
+            ingredient = new Ingredient(establishmentId, name, unit, minimum);
         } catch (IllegalArgumentException ex) {
             throw new BusinessRuleException(ex.getMessage());
         }
@@ -121,7 +121,7 @@ public class IngredientService {
         }
 
         return ingredientRepository.findByFilters(
-                actor.getCoffeeShop().getId(),
+                actor.getEstablishment().getId(),
                 active,
                 onlyLowStock,
                 sanitize(pageable)
@@ -139,9 +139,9 @@ public class IngredientService {
         );
 
         return ingredientRepository
-                .findByIdAndCoffeeShopId(
+                .findByIdAndEstablishmentId(
                         ingredientId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }
@@ -175,7 +175,7 @@ public class IngredientService {
                 }
 
                 if (ingredientRepository.existsByNameExcludingId(
-                        ingredient.getCoffeeShopId(),
+                        ingredient.getEstablishmentId(),
                         ingredient.getId(),
                         name
                 )) {
@@ -221,9 +221,9 @@ public class IngredientService {
 
     private Ingredient lockIngredient(User actor, Long ingredientId) {
         return ingredientRepository
-                .findByIdAndCoffeeShopIdForUpdate(
+                .findByIdAndEstablishmentIdForUpdate(
                         ingredientId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }

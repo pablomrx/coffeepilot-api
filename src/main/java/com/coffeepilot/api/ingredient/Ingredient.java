@@ -29,8 +29,8 @@ public class Ingredient {
     @GeneratedValue(strategy = GenerationType.IDENTITY)
     private Long id;
 
-    @Column(name = "coffee_shop_id", nullable = false, updatable = false)
-    private Long coffeeShopId;
+    @Column(name = "establishment_id", nullable = false, updatable = false)
+    private Long establishmentId;
 
     @Column(nullable = false, length = NAME_MAX_LENGTH)
     private String name;
@@ -60,20 +60,20 @@ public class Ingredient {
     }
 
     public Ingredient(
-            Long coffeeShopId,
+            Long establishmentId,
             String name,
             IngredientUnit unit,
             BigDecimal minimumQuantity
     ) {
-        Objects.requireNonNull(coffeeShopId, "coffeeShopId is required");
+        Objects.requireNonNull(establishmentId, "establishmentId is required");
 
-        if (coffeeShopId <= 0) {
+        if (establishmentId <= 0) {
             throw new IllegalArgumentException(
-                    "coffeeShopId must be positive."
+                    "establishmentId must be positive."
             );
         }
 
-        this.coffeeShopId = coffeeShopId;
+        this.establishmentId = establishmentId;
 
         this.unit = Objects.requireNonNull(
                 unit,
@@ -168,8 +168,8 @@ public class Ingredient {
         return id;
     }
 
-    public Long getCoffeeShopId() {
-        return coffeeShopId;
+    public Long getEstablishmentId() {
+        return establishmentId;
     }
 
     public String getName() {

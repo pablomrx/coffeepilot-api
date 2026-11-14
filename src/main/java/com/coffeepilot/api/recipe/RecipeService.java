@@ -65,16 +65,16 @@ public class RecipeService {
                 RECIPE_READ_ROLES
         );
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         Product product = productRepository
-                .findByIdAndCoffeeShopId(productId, coffeeShopId)
+                .findByIdAndEstablishmentId(productId, establishmentId)
                 .orElseThrow(this::productNotFound);
 
         return new RecipeView(
                 product,
                 recipeItemRepository.findByProduct(
-                        coffeeShopId,
+                        establishmentId,
                         product.getId()
                 )
         );
@@ -93,19 +93,19 @@ public class RecipeService {
 
         validateLines(lines);
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         Product product = productRepository
-                .findByIdAndCoffeeShopIdForUpdate(productId, coffeeShopId)
+                .findByIdAndEstablishmentIdForUpdate(productId, establishmentId)
                 .orElseThrow(this::productNotFound);
 
         Map<Long, Ingredient> ingredients =
-                lockActiveIngredients(coffeeShopId, lines);
+                lockActiveIngredients(establishmentId, lines);
 
         List<RecipeItem> newItems =
-                buildItems(coffeeShopId, product.getId(), lines, ingredients);
+                buildItems(establishmentId, product.getId(), lines, ingredients);
 
-        recipeItemRepository.deleteByProduct(coffeeShopId, product.getId());
+        recipeItemRepository.deleteByProduct(establishmentId, product.getId());
         recipeItemRepository.saveAll(newItems);
 
         product.touch();
@@ -114,7 +114,7 @@ public class RecipeService {
         return new RecipeView(
                 product,
                 recipeItemRepository.findByProduct(
-                        coffeeShopId,
+                        establishmentId,
                         product.getId()
                 )
         );
@@ -169,7 +169,7 @@ public class RecipeService {
     }
 
     private Map<Long, Ingredient> lockActiveIngredients(
-            Long coffeeShopId,
+            Long establishmentId,
             List<RecipeLine> lines
     ) {
         if (lines.isEmpty()) {
@@ -182,7 +182,7 @@ public class RecipeService {
                 .toList();
 
         List<Ingredient> found =
-                ingredientRepository.findAllByIdsForUpdate(coffeeShopId, ids);
+                ingredientRepository.findAllByIdsForUpdate(establishmentId, ids);
 
         if (found.size() != ids.size()) {
             throw new BusinessRuleException("Ingrediente não encontrado.");
@@ -209,7 +209,7 @@ public class RecipeService {
     }
 
     private List<RecipeItem> buildItems(
-            Long coffeeShopId,
+            Long establishmentId,
             Long productId,
             List<RecipeLine> lines,
             Map<Long, Ingredient> ingredients
@@ -217,7 +217,7 @@ public class RecipeService {
         try {
             return lines.stream()
                     .map(line -> new RecipeItem(
-                            coffeeShopId,
+                            establishmentId,
                             productId,
                             ingredients.get(line.ingredientId()),
                             line.quantity()

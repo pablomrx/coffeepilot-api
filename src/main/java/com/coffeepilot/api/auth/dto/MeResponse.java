@@ -7,8 +7,8 @@ public record MeResponse(
         String name,
         String email,
         String role,
-        Long coffeeShopId,
-        String coffeeShopName
+        Long establishmentId,
+        String establishmentName
 ) {
 
     public static MeResponse from(AuthenticatedUser user) {
@@ -17,8 +17,8 @@ public record MeResponse(
                 user.name(),
                 user.email(),
                 user.role().name(),
-                user.coffeeShopId(),
-                user.coffeeShopName()
+                user.establishmentId(),
+                user.establishmentName()
         );
     }
 }

@@ -16,18 +16,18 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             value = """
                     SELECT m FROM StockMovement m
                     JOIN FETCH m.createdBy
-                    WHERE m.coffeeShop.id = :coffeeShopId
+                    WHERE m.establishment.id = :establishmentId
                       AND m.ingredient.id = :ingredientId
                     ORDER BY m.createdAt DESC, m.id DESC
                     """,
             countQuery = """
                     SELECT COUNT(m) FROM StockMovement m
-                    WHERE m.coffeeShop.id = :coffeeShopId
+                    WHERE m.establishment.id = :establishmentId
                       AND m.ingredient.id = :ingredientId
                     """
     )
     Page<StockMovement> findHistory(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("ingredientId") Long ingredientId,
             Pageable pageable
     );
@@ -40,13 +40,13 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
             SELECT new com.coffeepilot.api.stock.StockConsumptionLine(
                 m.id, m.ingredient.id, m.quantityDelta)
             FROM StockMovement m
-            WHERE m.coffeeShop.id = :coffeeShopId
+            WHERE m.establishment.id = :establishmentId
               AND m.orderId = :orderId
               AND m.type = com.coffeepilot.api.stock.StockMovementType.CONSUMPTION
             ORDER BY m.ingredient.id
             """)
     List<StockConsumptionLine> findConsumptionLinesByOrder(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("orderId") Long orderId
     );
 
@@ -55,31 +55,31 @@ public interface StockMovementRepository extends JpaRepository<StockMovement, Lo
     // sido bloqueados, para não carregar saldos desatualizados.
     @Query("""
             SELECT m FROM StockMovement m
-            WHERE m.coffeeShop.id = :coffeeShopId
+            WHERE m.establishment.id = :establishmentId
               AND m.orderId = :orderId
               AND m.type = com.coffeepilot.api.stock.StockMovementType.CONSUMPTION
             ORDER BY m.ingredient.id
             """)
     List<StockMovement> findConsumptionsByOrder(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("orderId") Long orderId
     );
 
-    // Busca uma movimentação restrita à cafeteria.
-    Optional<StockMovement> findByIdAndCoffeeShopId(
+    // Busca uma movimentação restrita ao estabelecimento.
+    Optional<StockMovement> findByIdAndEstablishmentId(
             Long id,
-            Long coffeeShopId
+            Long establishmentId
     );
 
     // Verifica se a movimentação já foi estornada.
-    boolean existsByReversesMovementIdAndCoffeeShopId(
+    boolean existsByReversesMovementIdAndEstablishmentId(
             Long reversesMovementId,
-            Long coffeeShopId
+            Long establishmentId
     );
 
     // Verifica se o ingrediente já possui alguma movimentação.
-    boolean existsByIngredientIdAndCoffeeShopId(
+    boolean existsByIngredientIdAndEstablishmentId(
             Long ingredientId,
-            Long coffeeShopId
+            Long establishmentId
     );
 }

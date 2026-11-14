@@ -7,11 +7,11 @@ import java.util.Optional;
 
 public interface UserRepository extends JpaRepository<User, Long> {
 
-    @EntityGraph(attributePaths = "coffeeShop")
+    @EntityGraph(attributePaths = "establishment")
     Optional<User> findByEmail(String email);
 
     boolean existsByEmail(String email);
 
-    @EntityGraph(attributePaths = "coffeeShop")
-    Optional<User> findWithCoffeeShopById(Long id);
+    @EntityGraph(attributePaths = "establishment")
+    Optional<User> findWithEstablishmentById(Long id);
 }
