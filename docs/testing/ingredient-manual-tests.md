@@ -1,6 +1,6 @@
 # Testes manuais: endpoints de ingredientes
 
-Registro dos testes manuais feitos no Postman contra os endpoints de ingredientes do CoffeePilot: cadastro (com saldo inicial), listagem com filtros, detalhe, atualização parcial e ativação/desativação. O documento cobre regras de negócio, validação, permissões, isolamento entre cafeterias e a consistência entre o saldo dos ingredientes e o histórico de movimentações.
+Registro dos testes manuais feitos no Postman contra os endpoints de ingredientes do CoffeePilot: cadastro (com saldo inicial), listagem com filtros, detalhe, atualização parcial e ativação/desativação. O documento cobre regras de negócio, validação, permissões, isolamento entre estabelecimentos e a consistência entre o saldo dos ingredientes e o histórico de movimentações.
 
 ## Ambiente
 
@@ -27,7 +27,7 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 ## O que os testes provam
 
 - **Cadastro atômico:** o ingrediente e a movimentação `INITIAL` são gravados na mesma transação. Se o saldo inicial for inválido, nada é gravado.
-- **Nome único por cafeteria:** a checagem ignora caixa e espaços nas pontas, e o mesmo nome pode existir em cafeterias diferentes.
+- **Nome único por estabelecimento:** a checagem ignora caixa e espaços nas pontas, e o mesmo nome pode existir em estabelecimentos diferentes.
 - **Unidade `UNIT`:** aceita só números inteiros, no saldo inicial e no estoque mínimo.
 - **Atualização parcial:** só os campos enviados mudam. Unidade, saldo e status enviados no corpo são ignorados.
 - **Saldo preservado na edição:** o `PATCH` não sobrescreve o saldo (a linha é bloqueada durante a edição).
@@ -35,7 +35,7 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 - **Estoque baixo:** conta o saldo igual ao mínimo, ignora ingredientes inativos e os de mínimo zero.
 - **Desativação:** ingrediente inativo não recebe movimentações, mas o histórico continua visível e ele pode ser reativado.
 - **Permissões:** ATTENDANT não acessa o módulo. As permissões são verificadas no backend.
-- **Isolamento:** uma cafeteria não enxerga nem altera ingredientes de outra, e a resposta (404) é idêntica à de um recurso inexistente.
+- **Isolamento:** um estabelecimento não enxerga nem altera ingredientes de outro, e a resposta (404) é idêntica à de um recurso inexistente.
 - **Consistência:** ao final, o saldo de cada ingrediente bate com o `balance_after` da última movimentação e com a soma dos deltas.
 
 ---
@@ -46,9 +46,9 @@ Reaproveitou o ambiente dos testes de estoque, sem recriar o banco.
 
 | Item | Valor |
 |---|---|
-| Cafeteria A | OWNER, MANAGER, STOCKIST e ATTENDANT |
-| Cafeteria B | OWNER |
-| Ingredientes pré-existentes | Café (id 2, saldo 1400, mínimo 200), Ovo (3, `UNIT`, saldo 10), Açúcar (5, inativo) na cafeteria A, e Leite (4, saldo 500) na B |
+| Estabelecimento A | OWNER, MANAGER, STOCKIST e ATTENDANT |
+| Estabelecimento B | OWNER |
+| Ingredientes pré-existentes | Café (id 2, saldo 1400, mínimo 200), Ovo (3, `UNIT`, saldo 10), Açúcar (5, inativo) no estabelecimento A, e Leite (4, saldo 500) no B |
 
 Os ingredientes criados pela API recebem ids novos. O id 10 foi consumido pelo C6, cujo cadastro foi desfeito, então o ingrediente seguinte teria o id 11.
 
@@ -64,7 +64,7 @@ Os ingredientes criados pela API recebem ids novos. O id 10 foi consumido pelo C
 | C2 | STOCKIST | `{"name": "Chocolate", "unit": "G"}` | 201, saldo 0, sem movimentação | 201 ✅ (id 7) |
 | C3 | MANAGER | `{"name": "Copo descartável", "unit": "UNIT", "minimumQuantity": 50, "initialQuantity": 200}` | 201, saldo 200 | 201 ✅ (id 8) |
 | C4 | OWNER A | `{"name": "  FARINHA  ", "unit": "G"}` | 409 | 409 ✅ "Já existe um ingrediente com este nome." |
-| C5 | OWNER A | `{"name": "Leite", "unit": "ML", "initialQuantity": 100}` | 201 (o nome existe só na cafeteria B) | 201 ✅ (id 9) |
+| C5 | OWNER A | `{"name": "Leite", "unit": "ML", "initialQuantity": 100}` | 201 (o nome existe só no estabelecimento B) | 201 ✅ (id 9) |
 | C6 | OWNER A | `{"name": "Ovo Caipira", "unit": "UNIT", "initialQuantity": 2.5}` | 400, nada gravado | 400 ✅ "O saldo inicial deve ser um número inteiro para ingredientes em UNIT." |
 | C7a | OWNER A | `{"name": "   ", "unit": "G"}` | 400, campo `name` | 400 ✅ "O nome é obrigatório." |
 | C7b | OWNER A | `{"name": "Sal", "unit": "KG"}` | 400 | 400 ✅ "Corpo da requisição inválido ou ilegível." |
@@ -73,7 +73,7 @@ Os ingredientes criados pela API recebem ids novos. O id 10 foi consumido pelo C
 
 **Conferência no banco:**
 
-- Os ingredientes novos da cafeteria A são Farinha (2000), Chocolate (0), Copo descartável (200) e Leite (100). Os dois "Leite" coexistem, um em cada cafeteria.
+- Os ingredientes novos do estabelecimento A são Farinha (2000), Chocolate (0), Copo descartável (200) e Leite (100). Os dois "Leite" coexistem, um em cada estabelecimento.
 - Não existem "Ovo Caipira", "Sal" nem "Fermento".
 - Há três movimentações `INITIAL` novas: Farinha (id 15, 2000, Dono A), Copo descartável (id 16, 200, Gerente A) e Leite da A (id 17, 100, Dono A). O Chocolate não tem movimentação.
 - **Atomicidade (C6):** o id 10 de ingrediente foi consumido pela identity e a transação desfez o cadastro. Os ids de movimentação seguem sem salto (15, 16, 17).
@@ -84,7 +84,7 @@ Os ingredientes criados pela API recebem ids novos. O id 10 foi consumido pelo C
 
 ## Bloco 2: Listagem
 
-`GET /ingredients`. Estado da cafeteria A: 7 ingredientes, 6 ativos e o Açúcar inativo.
+`GET /ingredients`. Estado do estabelecimento A: 7 ingredientes, 6 ativos e o Açúcar inativo.
 
 | # | Token | Requisição | Esperado | Resultado |
 |---|---|---|---|---|
@@ -172,7 +172,7 @@ O saldo da Farinha continuou 2000 depois do U6, mesmo com o `PATCH` gravando a l
 
 ---
 
-## Bloco 7: Isolamento entre cafeterias
+## Bloco 7: Isolamento entre estabelecimentos
 
 | # | Token | Requisição | Esperado | Resultado |
 |---|---|---|---|---|
@@ -181,7 +181,7 @@ O saldo da Farinha continuou 2000 depois do U6, mesmo com o `PATCH` gravando a l
 | IS3 | OWNER A | `PATCH /ingredients/4` com `{"name": "Invadido"}` | 404 (o Leite id 4 é da B) | 404 ✅ |
 | IS4 | OWNER B | `GET /ingredients` | 200, só o Leite da B | 200 ✅ `totalElements` 1 |
 
-**Conferência no banco:** Café ("Café", ativo, cafeteria 1) e Leite ("Leite", ativo, cafeteria 2) intactos, e nenhum ingrediente "Invadido". As mensagens de 404 são idênticas às de um id inexistente.
+**Conferência no banco:** Café ("Café", ativo, estabelecimento 1) e Leite ("Leite", ativo, estabelecimento 2) intactos, e nenhum ingrediente "Invadido". As mensagens de 404 são idênticas às de um id inexistente.
 
 ---
 

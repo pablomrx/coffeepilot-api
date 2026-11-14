@@ -1,6 +1,6 @@
 # Testes manuais: endpoints de produtos
 
-Registro dos testes manuais feitos no Postman contra os endpoints de produtos do CoffeePilot: cadastro, listagem com filtros e busca, consulta, atualização parcial e ativação/desativação. O documento cobre regras de negócio, validação, permissões, visibilidade por perfil, isolamento entre cafeterias e o estado do banco.
+Registro dos testes manuais feitos no Postman contra os endpoints de produtos do CoffeePilot: cadastro, listagem com filtros e busca, consulta, atualização parcial e ativação/desativação. O documento cobre regras de negócio, validação, permissões, visibilidade por perfil, isolamento entre estabelecimentos e o estado do banco.
 
 ## Ambiente
 
@@ -26,21 +26,21 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 
 ## O que os testes provam
 
-- **Cadastro:** o nome é aparado, a descrição em branco vira `null`, o preço é gravado com 2 casas decimais e o mesmo nome é permitido em cafeterias diferentes.
+- **Cadastro:** o nome é aparado, a descrição em branco vira `null`, o preço é gravado com 2 casas decimais e o mesmo nome é permitido em estabelecimentos diferentes.
 - **Validação:** nome em branco ou acima de 150 caracteres, descrição acima de 500, preço ausente, zero, com mais de 2 casas decimais ou com mais de 8 dígitos inteiros são rejeitados com 400 e o campo correto. O preço máximo (99999999.99) é aceito.
-- **Unicidade:** o nome é único por cafeteria, sem diferenciar maiúsculas de minúsculas nem espaços nas pontas. Produto inativo continua reservando o nome.
+- **Unicidade:** o nome é único por estabelecimento, sem diferenciar maiúsculas de minúsculas nem espaços nas pontas. Produto inativo continua reservando o nome.
 - **Listagem:** busca parcial por nome sem diferenciar caixa, com `%` e `_` tratados como texto literal; filtro por status; tamanho de página limitado a 100; ordenação fixa por nome e id, ignorando o `sort` do cliente.
 - **Atualização parcial:** campo ausente não altera, `description: ""` remove a descrição, corpo vazio é rejeitado, e o próprio produto pode mudar a caixa do nome sem conflitar consigo mesmo.
 - **Permissões:** só OWNER e MANAGER criam e editam. ATTENDANT e STOCKIST apenas consultam. As permissões são verificadas no backend.
 - **Visibilidade:** o ATTENDANT nunca vê produto inativo (nem filtrando por `active=false`), enquanto o STOCKIST vê todos.
-- **Isolamento:** uma cafeteria não enxerga nem altera produtos de outra, e a resposta (404) é idêntica à de um recurso inexistente.
-- **Banco:** nomes aparados, descrições em branco gravadas como `NULL`, sem duplicidade de nome por cafeteria e `updated_at` alterado apenas nos produtos editados.
+- **Isolamento:** um estabelecimento não enxerga nem altera produtos de outro, e a resposta (404) é idêntica à de um recurso inexistente.
+- **Banco:** nomes aparados, descrições em branco gravadas como `NULL`, sem duplicidade de nome por estabelecimento e `updated_at` alterado apenas nos produtos editados.
 
 ---
 
 ## Setup
 
-Foram reaproveitadas as contas dos testes de estoque: cafeteria A (OWNER, MANAGER, STOCKIST e ATTENDANT) e cafeteria B (OWNER).
+Foram reaproveitadas as contas dos testes de estoque: estabelecimento A (OWNER, MANAGER, STOCKIST e ATTENDANT) e estabelecimento B (OWNER).
 
 | # | O que foi feito | Resultado |
 |---|---|---|
@@ -54,12 +54,12 @@ O Brownie fica inativo para os testes de visibilidade.
 
 | Variável | Valor | Descrição |
 |---|---|---|
-| `idBrownie` | 1 | Brownie, cafeteria A, inativo |
-| `idCappuccino` | 2 | Cappuccino, cafeteria A |
-| `idEspresso` | 3 | Espresso, cafeteria A |
-| `idLatte` | 4 | Latte, cafeteria A (renomeado para "LATTE GRANDE" no Bloco 6) |
-| `idCappuccinoB` | 5 | Cappuccino, cafeteria B |
-| `idCaro` | 6 | Caro, cafeteria A |
+| `idBrownie` | 1 | Brownie, estabelecimento A, inativo |
+| `idCappuccino` | 2 | Cappuccino, estabelecimento A |
+| `idEspresso` | 3 | Espresso, estabelecimento A |
+| `idLatte` | 4 | Latte, estabelecimento A (renomeado para "LATTE GRANDE" no Bloco 6) |
+| `idCappuccinoB` | 5 | Cappuccino, estabelecimento B |
+| `idCaro` | 6 | Caro, estabelecimento A |
 
 Os produtos rejeitados por validação ou por duplicidade não chegaram ao `INSERT`, então não consumiram id da identity.
 
@@ -74,9 +74,9 @@ Os produtos rejeitados por validação ou por duplicidade não chegaram ao `INSE
 | C1 | OWNER A | `{"name":"Cappuccino","description":"Com chocolate","price":12.50}` | 201, `price` 12.50, `active: true` | 201 ✅ (id 2) |
 | C2 | MANAGER | `{"name":"Espresso","price":8}` | 201, `price` 8.00, `description` nulo | 201 ✅ (id 3, o inteiro `8` virou `8.00`) |
 | C3 | OWNER A | `{"name":"  Latte  ","description":"   ","price":15.9}` | 201, nome "Latte", `description` nulo, `price` 15.90 | 201 ✅ (id 4) |
-| C4 | OWNER B | `{"name":"Cappuccino","price":13}` | 201 (mesmo nome em outra cafeteria) | 201 ✅ (id 5) |
+| C4 | OWNER B | `{"name":"Cappuccino","price":13}` | 201 (mesmo nome em outro estabelecimento) | 201 ✅ (id 5) |
 
-O C3 confirma o `trim()` do nome e a conversão de descrição em branco para `null`. O C4 confirma que a unicidade é por cafeteria.
+O C3 confirma o `trim()` do nome e a conversão de descrição em branco para `null`. O C4 confirma que a unicidade é por estabelecimento.
 
 ---
 
@@ -108,13 +108,13 @@ Conferência: V1 a V7 não deixaram rastro no banco. O V5 retornou uma única vi
 | D1 | `{"name":"cappuccino","price":10}` | 409, `fieldErrors` vazio | 409 ✅ "Já existe um produto com este nome." |
 | D2 | `{"name":"  CAPPUCCINO  ","price":10}` | 409, mesma resposta | 409 ✅ |
 
-A checagem `existsByName` normaliza com `LOWER(TRIM(...))` e o service barra antes do `INSERT`. Por isso a resposta vem com `fieldErrors` vazio e nenhum id é consumido. O 409 com o campo `name` só ocorre na corrida entre duas requisições simultâneas, quando o índice `uq_products_coffee_shop_name` barra a segunda, caso coberto por teste automatizado no `GlobalExceptionHandlerTest`.
+A checagem `existsByName` normaliza com `LOWER(TRIM(...))` e o service barra antes do `INSERT`. Por isso a resposta vem com `fieldErrors` vazio e nenhum id é consumido. O 409 com o campo `name` só ocorre na corrida entre duas requisições simultâneas, quando o índice `uq_products_establishment_name` barra a segunda, caso coberto por teste automatizado no `GlobalExceptionHandlerTest`.
 
 ---
 
 ## Bloco 4: Listagem
 
-`GET /products` com OWNER A. A cafeteria A tinha 5 produtos: Brownie (inativo), Cappuccino, Caro, Espresso e Latte.
+`GET /products` com OWNER A. O estabelecimento A tinha 5 produtos: Brownie (inativo), Cappuccino, Caro, Espresso e Latte.
 
 | # | Requisição | Esperado | Resultado |
 |---|---|---|---|
@@ -190,9 +190,9 @@ O P5 mostra que o filtro `active=false` enviado pelo cliente é sobrescrito para
 
 ---
 
-## Bloco 9: Isolamento entre cafeterias
+## Bloco 9: Isolamento entre estabelecimentos
 
-A cafeteria B tem só o Cappuccino (id 5).
+O estabelecimento B tem só o Cappuccino (id 5).
 
 | # | Token | Requisição | Esperado | Resultado |
 |---|---|---|---|---|
@@ -202,7 +202,7 @@ A cafeteria B tem só o Cappuccino (id 5).
 
 **Conferência com OWNER A:** `GET /products/2` retornou `active: true`, `price` 12.50 e `updatedAt` igual ao `createdAt`. Isso comprova que o P2, o P3 e o I2 não alteraram o produto.
 
-A resposta 404 do isolamento é idêntica à de um produto inexistente (compare com o G2), então o cliente não distingue "existe em outra cafeteria" de "não existe".
+A resposta 404 do isolamento é idêntica à de um produto inexistente (compare com o G2), então o cliente não distingue "existe em outro estabelecimento" de "não existe".
 
 ---
 
@@ -211,11 +211,11 @@ A resposta 404 do isolamento é idêntica à de um produto inexistente (compare 
 **V1: estado final da tabela**
 
 ```sql
-SELECT id, coffee_shop_id, name, description, price, is_active
+SELECT id, establishment_id, name, description, price, is_active
 FROM products ORDER BY id;
 ```
 
-| id | coffee_shop_id | name | description | price | is_active |
+| id | establishment_id | name | description | price | is_active |
 |---|---|---|---|---|---|
 | 1 | 1 | Brownie | (nulo) | 9.00 | f |
 | 2 | 1 | Cappuccino | Com chocolate | 12.50 | t |
@@ -226,12 +226,12 @@ FROM products ORDER BY id;
 
 Descrições em branco foram gravadas como `NULL`, os nomes foram aparados e os preços têm 2 casas decimais.
 
-**V2: nenhuma duplicidade de nome por cafeteria**
+**V2: nenhuma duplicidade de nome por estabelecimento**
 
 ```sql
-SELECT coffee_shop_id, LOWER(BTRIM(name)), COUNT(*)
+SELECT establishment_id, LOWER(BTRIM(name)), COUNT(*)
 FROM products
-GROUP BY coffee_shop_id, LOWER(BTRIM(name))
+GROUP BY establishment_id, LOWER(BTRIM(name))
 HAVING COUNT(*) > 1;
 ```
 
@@ -253,7 +253,7 @@ FROM products ORDER BY id;
 | 5 | Cappuccino | f |
 | 6 | Caro | f |
 
-Foram editados apenas o Brownie (desativado no S3) e o LATTE GRANDE (blocos 6 e 7). O Cappuccino da cafeteria A (id 2) não foi alterado pelos testes de permissão (P2, P3) nem de isolamento (I2).
+Foram editados apenas o Brownie (desativado no S3) e o LATTE GRANDE (blocos 6 e 7). O Cappuccino do estabelecimento A (id 2) não foi alterado pelos testes de permissão (P2, P3) nem de isolamento (I2).
 
 ---
 
