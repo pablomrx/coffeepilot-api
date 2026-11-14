@@ -1,7 +1,7 @@
 CREATE TABLE products (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    coffee_shop_id BIGINT NOT NULL,
+    establishment_id BIGINT NOT NULL,
 
     name VARCHAR(150) NOT NULL,
     description VARCHAR(500),
@@ -13,9 +13,9 @@ CREATE TABLE products (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_products_coffee_shop
-        FOREIGN KEY (coffee_shop_id)
-        REFERENCES coffee_shops (id),
+    CONSTRAINT fk_products_establishment
+        FOREIGN KEY (establishment_id)
+        REFERENCES establishments (id),
 
     CONSTRAINT ck_products_name_not_blank
         CHECK (BTRIM(name) <> ''),
@@ -24,17 +24,17 @@ CREATE TABLE products (
         CHECK (
             description IS NULL
             OR BTRIM(description) <> ''
-    ),
+        ),
 
     CONSTRAINT ck_products_price_positive
         CHECK (price > 0),
 
-    CONSTRAINT uq_products_id_coffee_shop
-        UNIQUE (id, coffee_shop_id)
+    CONSTRAINT uq_products_id_establishment
+        UNIQUE (id, establishment_id)
 );
 
-CREATE UNIQUE INDEX uq_products_coffee_shop_name
-    ON products (coffee_shop_id, LOWER(BTRIM(name)));
+CREATE UNIQUE INDEX uq_products_establishment_name
+    ON products (establishment_id, LOWER(BTRIM(name)));
 
-CREATE INDEX idx_products_coffee_shop_active
-    ON products (coffee_shop_id, is_active);
+CREATE INDEX idx_products_establishment_active
+    ON products (establishment_id, is_active);
