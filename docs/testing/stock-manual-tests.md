@@ -1,6 +1,6 @@
 # Testes manuais: endpoints de estoque
 
-Registro dos testes manuais feitos no Postman contra os endpoints de estoque do CoffeePilot: entrada, ajuste, estorno e histórico de movimentações. O documento cobre regras de negócio, validação, permissões, isolamento entre cafeterias, estado do banco e a consistência entre o saldo dos ingredientes e o histórico de movimentações.
+Registro dos testes manuais feitos no Postman contra os endpoints de estoque do CoffeePilot: entrada, ajuste, estorno e histórico de movimentações. O documento cobre regras de negócio, validação, permissões, isolamento entre estabelecimentos, estado do banco e a consistência entre o saldo dos ingredientes e o histórico de movimentações.
 
 ## Ambiente
 
@@ -31,7 +31,7 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 - **Saldo:** operação que deixaria o saldo negativo (409) ou acima do máximo (400) é barrada sem alterar nada.
 - **Estorno:** exige justificativa, cria uma movimentação `REVERSAL` com delta oposto, e não pode ser repetido, aplicado a outro estorno ou ao saldo inicial.
 - **Permissões:** ATTENDANT não acessa o estoque, e STOCKIST não estorna. As permissões são verificadas no backend.
-- **Isolamento:** uma cafeteria não enxerga nem altera ingredientes e movimentações de outra, e a resposta (404) é idêntica à de um recurso inexistente.
+- **Isolamento:** um estabelecimento não enxerga nem altera ingredientes e movimentações de outro, e a resposta (404) é idêntica à de um recurso inexistente.
 - **Sessão:** o estado do banco vale mais que o token antigo (usuário inativo e cargo rebaixado).
 - **Consistência:** ao final, o saldo de cada ingrediente bate com o `balance_after` da última movimentação e com a soma dos deltas.
 
@@ -39,17 +39,17 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 
 ## Setup
 
-Contas da cafeteria A: OWNER, MANAGER, STOCKIST e ATTENDANT. Conta da cafeteria B: OWNER. Os ingredientes foram inseridos por SQL, junto com a movimentação `INITIAL` correspondente, porque o cadastro de ingredientes pela API ainda não existe.
+Contas do estabelecimento A: OWNER, MANAGER, STOCKIST e ATTENDANT. Conta do estabelecimento B: OWNER. Os ingredientes foram inseridos por SQL, junto com a movimentação `INITIAL` correspondente, porque o cadastro de ingredientes pela API ainda não existe.
 
 | # | O que foi feito | Resultado |
 |---|---|---|
-| S1 | `POST /auth/register` da cafeteria A (OWNER) e login | Conta criada, token em `tokenOwnerA` ✅ |
+| S1 | `POST /auth/register` do estabelecimento A (OWNER) e login | Conta criada, token em `tokenOwnerA` ✅ |
 | S2 | Criação de MANAGER, STOCKIST e ATTENDANT via `POST /employees` e login de cada um | 201 nas três, três tokens salvos ✅ |
-| S3 | `POST /auth/register` da cafeteria B (OWNER) e login | Conta criada, token em `tokenOwnerB` ✅ |
-| S4 | SQL: `Café` (G), cafeteria A, saldo 1000, mínimo 200, com `INITIAL` | Inserido ✅ |
-| S5 | SQL: `Ovo` (UNIT), cafeteria A, saldo 10, com `INITIAL` | Inserido ✅ |
-| S6 | SQL: `Leite` (ML), cafeteria B, saldo 500, com `INITIAL` | Inserido ✅ |
-| S7 | SQL: `Açúcar` (G), cafeteria A, inativo, sem movimentações | Inserido ✅ |
+| S3 | `POST /auth/register` do estabelecimento B (OWNER) e login | Conta criada, token em `tokenOwnerB` ✅ |
+| S4 | SQL: `Café` (G), estabelecimento A, saldo 1000, mínimo 200, com `INITIAL` | Inserido ✅ |
+| S5 | SQL: `Ovo` (UNIT), estabelecimento A, saldo 10, com `INITIAL` | Inserido ✅ |
+| S6 | SQL: `Leite` (ML), estabelecimento B, saldo 500, com `INITIAL` | Inserido ✅ |
+| S7 | SQL: `Açúcar` (G), estabelecimento A, inativo, sem movimentações | Inserido ✅ |
 
 ### Ids usados
 
@@ -57,15 +57,15 @@ O primeiro `INSERT` de um teste anterior de constraint consumiu o id 1 da identi
 
 | Variável | Valor | Descrição |
 |---|---|---|
-| `idCafe` | 2 | Café, cafeteria A |
-| `idOvo` | 3 | Ovo, cafeteria A |
-| `idLeite` | 4 | Leite, cafeteria B |
-| `idAcucar` | 5 | Açúcar, cafeteria A, inativo |
+| `idCafe` | 2 | Café, estabelecimento A |
+| `idOvo` | 3 | Ovo, estabelecimento A |
+| `idLeite` | 4 | Leite, estabelecimento B |
+| `idAcucar` | 5 | Açúcar, estabelecimento A, inativo |
 | `idInitialCafe` | 5 | Movimentação `INITIAL` do Café |
 | `idInitialOvo` | 6 | Movimentação `INITIAL` do Ovo |
 | `idInitialLeite` | 7 | Movimentação `INITIAL` do Leite |
 
-Usuários: 1 `owner.a`, 2 `manager.a`, 3 `stockist.a`, 4 `attendant.a` (cafeteria 1) e 5 `owner.b` (cafeteria 2).
+Usuários: 1 `owner.a`, 2 `manager.a`, 3 `stockist.a`, 4 `attendant.a` (estabelecimento 1) e 5 `owner.b` (estabelecimento 2).
 
 ---
 
@@ -155,7 +155,7 @@ Conferência no banco: saldo `1400.000` e 8 movimentações.
 
 ---
 
-## Bloco 6: Isolamento entre cafeterias
+## Bloco 6: Isolamento entre estabelecimentos
 
 | # | Token | Requisição | Esperado | Resultado |
 |---|---|---|---|---|
@@ -163,7 +163,7 @@ Conferência no banco: saldo `1400.000` e 8 movimentações.
 | I2 | OWNER B | `POST /stock/movements/9/reversals` (movimentação da A) | 404 | 404 ✅ "Movimentação não encontrada." |
 | I3 | OWNER A | `POST /ingredients/4/stock/entries` (Leite, da B) | 404 | 404 ✅ "Ingrediente não encontrado." |
 
-As mensagens são idênticas às de um recurso inexistente, então o cliente não distingue "existe em outra cafeteria" de "não existe". Conferência no banco: Café `1400.000`, Leite `500.000` e 9 movimentações no total (8 do Café e 1 do Leite).
+As mensagens são idênticas às de um recurso inexistente, então o cliente não distingue "existe em outro estabelecimento" de "não existe". Conferência no banco: Café `1400.000`, Leite `500.000` e 9 movimentações no total (8 do Café e 1 do Leite).
 
 ---
 

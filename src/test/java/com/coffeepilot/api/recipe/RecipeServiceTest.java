@@ -32,7 +32,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
 import com.coffeepilot.api.ingredient.Ingredient;
@@ -51,13 +51,13 @@ import com.coffeepilot.api.user.UserRepository;
 @ExtendWith(MockitoExtension.class)
 class RecipeServiceTest {
 
-    private static final Long COFFEE_SHOP_ID = 1L;
+    private static final Long ESTABLISHMENT_ID = 1L;
     private static final Long USER_ID = 10L;
     private static final Long PRODUCT_ID = 5L;
 
     private static final AuthenticatedUser AUTH_USER = new AuthenticatedUser(
             USER_ID, "Usuário", "usuario@teste.com",
-            Role.OWNER, COFFEE_SHOP_ID, "Estabelecimento");
+            Role.OWNER, ESTABLISHMENT_ID, "Estabelecimento");
 
     @Mock
     private UserRepository userRepository;
@@ -75,7 +75,7 @@ class RecipeServiceTest {
     private User user;
 
     @Mock
-    private CoffeeShop coffeeShop;
+    private Establishment establishment;
 
     @Captor
     private ArgumentCaptor<List<RecipeItem>> itemsCaptor;
@@ -94,12 +94,12 @@ class RecipeServiceTest {
                 ingredientRepository,
                 recipeItemRepository);
 
-        lenient().when(userRepository.findWithCoffeeShopById(USER_ID))
+        lenient().when(userRepository.findWithEstablishmentById(USER_ID))
                 .thenReturn(Optional.of(user));
         lenient().when(user.isActive()).thenReturn(true);
-        lenient().when(user.getCoffeeShop()).thenReturn(coffeeShop);
-        lenient().when(coffeeShop.isActive()).thenReturn(true);
-        lenient().when(coffeeShop.getId()).thenReturn(COFFEE_SHOP_ID);
+        lenient().when(user.getEstablishment()).thenReturn(establishment);
+        lenient().when(establishment.isActive()).thenReturn(true);
+        lenient().when(establishment.getId()).thenReturn(ESTABLISHMENT_ID);
 
         loginAs(Role.OWNER);
     }
@@ -112,7 +112,7 @@ class RecipeServiceTest {
 
     private Product product(boolean active) {
         Product product = new Product(
-                COFFEE_SHOP_ID, "Cappuccino", "Descrição", new BigDecimal("12.50"));
+                ESTABLISHMENT_ID, "Cappuccino", "Descrição", new BigDecimal("12.50"));
         ReflectionTestUtils.setField(product, "id", PRODUCT_ID);
 
         if (!active) {
@@ -125,7 +125,7 @@ class RecipeServiceTest {
     private Ingredient ingredient(
             Long id, String name, IngredientUnit unit, boolean active) {
         Ingredient ingredient = new Ingredient(
-                COFFEE_SHOP_ID, name, unit, BigDecimal.ZERO);
+                ESTABLISHMENT_ID, name, unit, BigDecimal.ZERO);
         ReflectionTestUtils.setField(ingredient, "id", id);
 
         if (!active) {
@@ -154,14 +154,14 @@ class RecipeServiceTest {
     }
 
     private void stubProductLock(Product product) {
-        when(productRepository.findByIdAndCoffeeShopIdForUpdate(
-                PRODUCT_ID, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(
+                PRODUCT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
     }
 
     private void stubIngredients(List<Ingredient> ingredients) {
         when(ingredientRepository.findAllByIdsForUpdate(
-                eq(COFFEE_SHOP_ID), any()))
+                eq(ESTABLISHMENT_ID), any()))
                 .thenReturn(ingredients);
     }
 
@@ -181,10 +181,10 @@ class RecipeServiceTest {
         loginAs(role);
         Product product = product(true);
         List<RecipeItem> items = List.of(
-                new RecipeItem(COFFEE_SHOP_ID, PRODUCT_ID, cafe(), new BigDecimal("30")));
-        when(productRepository.findByIdAndCoffeeShopId(PRODUCT_ID, COFFEE_SHOP_ID))
+                new RecipeItem(ESTABLISHMENT_ID, PRODUCT_ID, cafe(), new BigDecimal("30")));
+        when(productRepository.findByIdAndEstablishmentId(PRODUCT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
-        when(recipeItemRepository.findByProduct(COFFEE_SHOP_ID, PRODUCT_ID))
+        when(recipeItemRepository.findByProduct(ESTABLISHMENT_ID, PRODUCT_ID))
                 .thenReturn(items);
 
         RecipeView view = service.get(AUTH_USER, PRODUCT_ID);
@@ -196,7 +196,7 @@ class RecipeServiceTest {
     @Test
     void produtoInativoTemAReceitaConsultada() {
         Product product = product(false);
-        when(productRepository.findByIdAndCoffeeShopId(PRODUCT_ID, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(PRODUCT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
 
         RecipeView view = service.get(AUTH_USER, PRODUCT_ID);
@@ -207,13 +207,13 @@ class RecipeServiceTest {
 
     @Test
     void consultaNaoBloqueiaOProduto() {
-        when(productRepository.findByIdAndCoffeeShopId(PRODUCT_ID, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(PRODUCT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product(true)));
 
         service.get(AUTH_USER, PRODUCT_ID);
 
         verify(productRepository, never())
-                .findByIdAndCoffeeShopIdForUpdate(any(), any());
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     @Test
@@ -228,7 +228,7 @@ class RecipeServiceTest {
 
     @Test
     void consultarReceitaDeProdutoInexistenteOuDeOutroEstabelecimentoLancaNaoEncontrado() {
-        when(productRepository.findByIdAndCoffeeShopId(99L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(AUTH_USER, 99L))
@@ -251,14 +251,14 @@ class RecipeServiceTest {
         service.replace(AUTH_USER, PRODUCT_ID,
                 List.of(line(10L, "30"), line(11L, "150.5")));
 
-        verify(recipeItemRepository).deleteByProduct(COFFEE_SHOP_ID, PRODUCT_ID);
+        verify(recipeItemRepository).deleteByProduct(ESTABLISHMENT_ID, PRODUCT_ID);
         verify(recipeItemRepository).saveAll(itemsCaptor.capture());
 
         List<RecipeItem> saved = itemsCaptor.getValue();
 
         assertThat(saved).hasSize(2);
         assertThat(saved).allSatisfy(item -> {
-            assertThat(item.getCoffeeShopId()).isEqualTo(COFFEE_SHOP_ID);
+            assertThat(item.getEstablishmentId()).isEqualTo(ESTABLISHMENT_ID);
             assertThat(item.getProductId()).isEqualTo(PRODUCT_ID);
             assertThat(item.getQuantity().scale()).isEqualTo(3);
         });
@@ -274,8 +274,8 @@ class RecipeServiceTest {
         stubProductLock(product);
         stubIngredients(List.of(cafe()));
         List<RecipeItem> stored = List.of(
-                new RecipeItem(COFFEE_SHOP_ID, PRODUCT_ID, cafe(), new BigDecimal("30")));
-        when(recipeItemRepository.findByProduct(COFFEE_SHOP_ID, PRODUCT_ID))
+                new RecipeItem(ESTABLISHMENT_ID, PRODUCT_ID, cafe(), new BigDecimal("30")));
+        when(recipeItemRepository.findByProduct(ESTABLISHMENT_ID, PRODUCT_ID))
                 .thenReturn(stored);
 
         RecipeView view = service.replace(AUTH_USER, PRODUCT_ID, List.of(line(10L, "30")));
@@ -332,7 +332,7 @@ class RecipeServiceTest {
 
         service.replace(AUTH_USER, PRODUCT_ID, List.of());
 
-        verify(recipeItemRepository).deleteByProduct(COFFEE_SHOP_ID, PRODUCT_ID);
+        verify(recipeItemRepository).deleteByProduct(ESTABLISHMENT_ID, PRODUCT_ID);
         verify(recipeItemRepository).saveAll(itemsCaptor.capture());
         assertThat(itemsCaptor.getValue()).isEmpty();
         verifyNoInteractions(ingredientRepository);
@@ -380,11 +380,11 @@ class RecipeServiceTest {
                 productRepository, ingredientRepository, recipeItemRepository);
 
         order.verify(productRepository)
-                .findByIdAndCoffeeShopIdForUpdate(PRODUCT_ID, COFFEE_SHOP_ID);
+                .findByIdAndEstablishmentIdForUpdate(PRODUCT_ID, ESTABLISHMENT_ID);
         order.verify(ingredientRepository)
-                .findAllByIdsForUpdate(eq(COFFEE_SHOP_ID), any());
+                .findAllByIdsForUpdate(eq(ESTABLISHMENT_ID), any());
         order.verify(recipeItemRepository)
-                .deleteByProduct(COFFEE_SHOP_ID, PRODUCT_ID);
+                .deleteByProduct(ESTABLISHMENT_ID, PRODUCT_ID);
         order.verify(recipeItemRepository).saveAll(anyList());
         order.verify(productRepository).saveAndFlush(product);
     }
@@ -398,7 +398,7 @@ class RecipeServiceTest {
                 List.of(line(12L, "1"), line(10L, "30"), line(11L, "150")));
 
         verify(ingredientRepository)
-                .findAllByIdsForUpdate(eq(COFFEE_SHOP_ID), idsCaptor.capture());
+                .findAllByIdsForUpdate(eq(ESTABLISHMENT_ID), idsCaptor.capture());
         assertThat(idsCaptor.getValue()).containsExactly(10L, 11L, 12L);
     }
 
@@ -504,7 +504,7 @@ class RecipeServiceTest {
 
     @Test
     void produtoInexistenteOuDeOutroEstabelecimentoLancaNaoEncontrado() {
-        when(productRepository.findByIdAndCoffeeShopIdForUpdate(99L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.replace(
@@ -646,7 +646,7 @@ class RecipeServiceTest {
 
     @Test
     void estabelecimentoInativoNaoPodeSubstituirAReceita() {
-        when(coffeeShop.isActive()).thenReturn(false);
+        when(establishment.isActive()).thenReturn(false);
 
         assertThatThrownBy(() -> service.replace(
                 AUTH_USER, PRODUCT_ID, List.of(line(10L, "30"))))

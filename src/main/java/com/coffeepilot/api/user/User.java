@@ -1,6 +1,6 @@
 package com.coffeepilot.api.user;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -29,8 +29,8 @@ public class User {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "coffee_shop_id", nullable = false, updatable = false)
-    private CoffeeShop coffeeShop;
+    @JoinColumn(name = "establishment_id", nullable = false, updatable = false)
+    private Establishment establishment;
 
     @Column(nullable = false, length = 150)
     private String name;
@@ -60,13 +60,13 @@ public class User {
     }
 
     public User(
-            CoffeeShop coffeeShop,
+            Establishment establishment,
             String name,
             String email,
             String passwordHash,
             Role role
     ) {
-        this.coffeeShop = coffeeShop;
+        this.establishment = establishment;
         this.name = name;
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
@@ -83,8 +83,8 @@ public class User {
         return id;
     }
 
-    public CoffeeShop getCoffeeShop() {
-        return coffeeShop;
+    public Establishment getEstablishment() {
+        return establishment;
     }
 
     public String getName() {

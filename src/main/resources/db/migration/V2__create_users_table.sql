@@ -1,7 +1,7 @@
 CREATE TABLE users (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    coffee_shop_id BIGINT NOT NULL,
+    establishment_id BIGINT NOT NULL,
 
     name VARCHAR(150) NOT NULL,
     email VARCHAR(254) NOT NULL,
@@ -13,9 +13,9 @@ CREATE TABLE users (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_users_coffee_shop
-        FOREIGN KEY (coffee_shop_id)
-        REFERENCES coffee_shops (id),
+    CONSTRAINT fk_users_establishment
+        FOREIGN KEY (establishment_id)
+        REFERENCES establishments (id),
 
     CONSTRAINT ck_users_name_not_blank
         CHECK (BTRIM(name) <> ''),
@@ -32,9 +32,9 @@ CREATE TABLE users (
     CONSTRAINT uq_users_email
         UNIQUE (email),
 
-    CONSTRAINT uq_users_id_coffee_shop
-        UNIQUE (id, coffee_shop_id)
+    CONSTRAINT uq_users_id_establishment
+        UNIQUE (id, establishment_id)
 );
 
-CREATE INDEX idx_users_coffee_shop_id
-    ON users (coffee_shop_id);
+CREATE INDEX idx_users_establishment_id
+    ON users (establishment_id);

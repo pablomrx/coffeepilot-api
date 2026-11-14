@@ -62,7 +62,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void constraintDeNomeDeIngredienteVira409ComCampoName() {
         var response = handler.handleDataIntegrity(
-                violation("uq_ingredients_coffee_shop_name"), request);
+                violation("uq_ingredients_establishment_name"), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody().message())
@@ -75,7 +75,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void constraintDeNomeDeProdutoVira409ComCampoName() {
         var response = handler.handleDataIntegrity(
-                violation("uq_products_coffee_shop_name"), request);
+                violation("uq_products_establishment_name"), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody().message())
@@ -107,7 +107,7 @@ class GlobalExceptionHandlerTest {
 
     @Test
     void outraConstraintVira500() {
-        var response = handler.handleDataIntegrity(violation("fk_users_coffee_shop"), request);
+        var response = handler.handleDataIntegrity(violation("fk_users_establishment"), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(500);
     }
@@ -224,7 +224,7 @@ class GlobalExceptionHandlerTest {
     @Test
     void acessoNegadoVira403SemVazarOMotivo() {
         var response = handler.handleAccessDenied(
-                new AccessDeniedException("Usuário ou cafeteria inativa."), request);
+                new AccessDeniedException("Usuário ou estabelecimento inativo."), request);
 
         assertThat(response.getStatusCode().value()).isEqualTo(403);
         assertThat(response.getBody().message()).isEqualTo("Acesso negado.");

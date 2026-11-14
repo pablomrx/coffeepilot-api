@@ -22,11 +22,11 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
             LEFT JOIN FETCH o.cancelledBy
             LEFT JOIN FETCH o.items
             WHERE o.id = :id
-              AND o.coffeeShopId = :coffeeShopId
+              AND o.establishmentId = :establishmentId
             """)
-    Optional<Order> findDetailByIdAndCoffeeShopId(
+    Optional<Order> findDetailByIdAndEstablishmentId(
             @Param("id") Long id,
-            @Param("coffeeShopId") Long coffeeShopId
+            @Param("establishmentId") Long establishmentId
     );
 
     // Busca e bloqueia o pedido para mudança de status e cancelamento.
@@ -35,23 +35,23 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     @Query("""
             SELECT o FROM Order o
             WHERE o.id = :id
-              AND o.coffeeShopId = :coffeeShopId
+              AND o.establishmentId = :establishmentId
             """)
-    Optional<Order> findByIdAndCoffeeShopIdForUpdate(
+    Optional<Order> findByIdAndEstablishmentIdForUpdate(
             @Param("id") Long id,
-            @Param("coffeeShopId") Long coffeeShopId
+            @Param("establishmentId") Long establishmentId
     );
 
     // Listagens paginadas. A ordenação vem do service.
     @EntityGraph(attributePaths = {"createdBy"})
-    Page<Order> findByCoffeeShopId(
-            Long coffeeShopId,
+    Page<Order> findByEstablishmentId(
+            Long establishmentId,
             Pageable pageable
     );
 
     @EntityGraph(attributePaths = {"createdBy"})
-    Page<Order> findByCoffeeShopIdAndStatus(
-            Long coffeeShopId,
+    Page<Order> findByEstablishmentIdAndStatus(
+            Long establishmentId,
             OrderStatus status,
             Pageable pageable
     );

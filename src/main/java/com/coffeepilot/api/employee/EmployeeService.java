@@ -31,13 +31,13 @@ public class EmployeeService {
             CreateEmployeeRequest request) {
 
         User creator = userRepository
-                .findWithCoffeeShopById(authenticatedUser.userId())
+                .findWithEstablishmentById(authenticatedUser.userId())
                 .orElseThrow(() -> new IllegalStateException(
                         "Usuário autenticado não foi encontrado."));
 
-        if (!creator.isActive() || !creator.getCoffeeShop().isActive()) {
+        if (!creator.isActive() || !creator.getEstablishment().isActive()) {
             throw new AccessDeniedException(
-                    "Usuário ou cafeteria inativa.");
+                    "Usuário ou estabelecimento inativo.");
         }
 
         validatePermission(creator.getRole(), request.role());
@@ -47,7 +47,7 @@ public class EmployeeService {
         }
 
         User employee = new User(
-                creator.getCoffeeShop(),
+                creator.getEstablishment(),
                 request.name(),
                 request.email(),
                 passwordEncoder.encode(request.password()),

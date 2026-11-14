@@ -1,6 +1,6 @@
 package com.coffeepilot.api.stock;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.ingredient.Ingredient;
 import com.coffeepilot.api.ingredient.IngredientUnit;
 import com.coffeepilot.api.user.User;
@@ -39,8 +39,8 @@ public class StockMovement {
     private Long id;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
-    @JoinColumn(name = "coffee_shop_id", nullable = false, updatable = false)
-    private CoffeeShop coffeeShop;
+    @JoinColumn(name = "establishment_id", nullable = false, updatable = false)
+    private Establishment establishment;
 
     @ManyToOne(fetch = FetchType.LAZY, optional = false)
     @JoinColumn(name = "ingredient_id", nullable = false, updatable = false)
@@ -94,7 +94,7 @@ public class StockMovement {
     }
 
     public StockMovement(
-            CoffeeShop coffeeShop,
+            Establishment establishment,
             Ingredient ingredient,
             StockMovementType type,
             BigDecimal quantityDelta,
@@ -105,7 +105,7 @@ public class StockMovement {
             StockMovement reversesMovement
     ) {
         this(
-                coffeeShop,
+                establishment,
                 ingredient,
                 type,
                 quantityDelta,
@@ -119,7 +119,7 @@ public class StockMovement {
     }
 
     public StockMovement(
-            CoffeeShop coffeeShop,
+            Establishment establishment,
             Ingredient ingredient,
             StockMovementType type,
             BigDecimal quantityDelta,
@@ -131,7 +131,7 @@ public class StockMovement {
             Long orderId
     ) {
         Objects.requireNonNull(
-                coffeeShop,
+                establishment,
                 "Coffee shop is required."
         );
 
@@ -150,18 +150,18 @@ public class StockMovement {
                 "User responsible for the movement is required."
         );
 
-        if (!Objects.equals(coffeeShop.getId(), ingredient.getCoffeeShopId())) {
+        if (!Objects.equals(establishment.getId(), ingredient.getEstablishmentId())) {
             throw new IllegalArgumentException(
                     "Ingredient does not belong to the coffee shop."
             );
         }
 
-        CoffeeShop userCoffeeShop = Objects.requireNonNull(
-                createdBy.getCoffeeShop(),
+        Establishment userEstablishment = Objects.requireNonNull(
+                createdBy.getEstablishment(),
                 "User must belong to a coffee shop."
         );
 
-        if (!Objects.equals(coffeeShop.getId(), userCoffeeShop.getId())) {
+        if (!Objects.equals(establishment.getId(), userEstablishment.getId())) {
             throw new IllegalArgumentException(
                     "User does not belong to the coffee shop."
             );
@@ -173,7 +173,7 @@ public class StockMovement {
             );
         }
 
-        this.coffeeShop = coffeeShop;
+        this.establishment = establishment;
         this.ingredient = ingredient;
         this.type = type;
         this.createdBy = createdBy;
@@ -389,8 +389,8 @@ public class StockMovement {
         }
 
         if (!Objects.equals(
-                reversesMovement.getCoffeeShop().getId(),
-                coffeeShop.getId()
+                reversesMovement.getEstablishment().getId(),
+                establishment.getId()
         )) {
             throw new IllegalArgumentException(
                     "Reversal and original movement must belong to the same coffee shop."
@@ -416,8 +416,8 @@ public class StockMovement {
         return id;
     }
 
-    public CoffeeShop getCoffeeShop() {
-        return coffeeShop;
+    public Establishment getEstablishment() {
+        return establishment;
     }
 
     public Ingredient getIngredient() {

@@ -59,7 +59,7 @@ public class ProductService {
                 PRODUCT_MANAGE_ROLES
         );
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         if (name == null || name.isBlank()) {
             throw new BusinessRuleException("O nome é obrigatório.");
@@ -69,14 +69,14 @@ public class ProductService {
             throw new BusinessRuleException("O preço é obrigatório.");
         }
 
-        if (productRepository.existsByName(coffeeShopId, name)) {
+        if (productRepository.existsByName(establishmentId, name)) {
             throw new BusinessConflictException(DUPLICATE_NAME_MESSAGE);
         }
 
         Product product;
 
         try {
-            product = new Product(coffeeShopId, name, description, price);
+            product = new Product(establishmentId, name, description, price);
         } catch (IllegalArgumentException ex) {
             throw new BusinessRuleException(ex.getMessage());
         }
@@ -101,7 +101,7 @@ public class ProductService {
                 actor.getRole() == Role.ATTENDANT ? Boolean.TRUE : active;
 
         return productRepository.findByFilters(
-                actor.getCoffeeShop().getId(),
+                actor.getEstablishment().getId(),
                 effectiveActive,
                 toSearchPattern(search),
                 sanitize(pageable)
@@ -119,9 +119,9 @@ public class ProductService {
         );
 
         Product product = productRepository
-                .findByIdAndCoffeeShopId(
+                .findByIdAndEstablishmentId(
                         productId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
 
@@ -163,7 +163,7 @@ public class ProductService {
                 }
 
                 if (productRepository.existsByNameExcludingId(
-                        product.getCoffeeShopId(),
+                        product.getEstablishmentId(),
                         product.getId(),
                         name
                 )) {
@@ -212,9 +212,9 @@ public class ProductService {
 
     private Product lockProduct(User actor, Long productId) {
         return productRepository
-                .findByIdAndCoffeeShopIdForUpdate(
+                .findByIdAndEstablishmentIdForUpdate(
                         productId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }

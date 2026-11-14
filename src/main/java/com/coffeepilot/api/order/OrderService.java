@@ -87,7 +87,7 @@ public class OrderService {
 
         validateLines(lines);
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         Map<Long, Integer> quantityByProduct = new HashMap<>();
 
@@ -100,7 +100,7 @@ public class OrderService {
                 .toList();
 
         List<Product> products =
-                productRepository.findAllByIdsForShare(coffeeShopId, productIds);
+                productRepository.findAllByIdsForShare(establishmentId, productIds);
 
         if (products.size() != productIds.size()) {
             throw new BusinessRuleException("Produto não encontrado.");
@@ -116,7 +116,7 @@ public class OrderService {
 
         List<RecipeLineView> recipeLines =
                 recipeItemRepository.findLinesByProducts(
-                        coffeeShopId,
+                        establishmentId,
                         productIds
                 );
 
@@ -135,18 +135,18 @@ public class OrderService {
 
         if (!required.isEmpty()) {
             ingredientRepository.findAllByIdsForUpdate(
-                    coffeeShopId,
+                    establishmentId,
                     new ArrayList<>(required.keySet())
             );
         }
 
-        long orderNumber = nextOrderNumber(coffeeShopId);
+        long orderNumber = nextOrderNumber(establishmentId);
 
         Order order;
 
         try {
             order = new Order(
-                    coffeeShopId,
+                    establishmentId,
                     orderNumber,
                     actor,
                     tableReference,
@@ -194,13 +194,13 @@ public class OrderService {
                 ORDER_ROLES
         );
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
         Pageable page = sanitize(pageable);
 
         return status == null
-                ? orderRepository.findByCoffeeShopId(coffeeShopId, page)
-                : orderRepository.findByCoffeeShopIdAndStatus(
-                coffeeShopId,
+                ? orderRepository.findByEstablishmentId(establishmentId, page)
+                : orderRepository.findByEstablishmentIdAndStatus(
+                establishmentId,
                 status,
                 page
         );
@@ -217,9 +217,9 @@ public class OrderService {
         );
 
         return orderRepository
-                .findDetailByIdAndCoffeeShopId(
+                .findDetailByIdAndEstablishmentId(
                         orderId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }
@@ -312,11 +312,11 @@ public class OrderService {
         return reload(actor, orderId);
     }
 
-    private long nextOrderNumber(Long coffeeShopId) {
-        orderSequenceRepository.createIfMissing(coffeeShopId);
+    private long nextOrderNumber(Long establishmentId) {
+        orderSequenceRepository.createIfMissing(establishmentId);
 
         OrderSequence sequence = orderSequenceRepository
-                .findForUpdate(coffeeShopId)
+                .findForUpdate(establishmentId)
                 .orElseThrow(() -> new IllegalStateException(
                         "Contador de pedidos não encontrado."
                 ));
@@ -377,18 +377,18 @@ public class OrderService {
 
     private Order lockOrder(User actor, Long orderId) {
         return orderRepository
-                .findByIdAndCoffeeShopIdForUpdate(
+                .findByIdAndEstablishmentIdForUpdate(
                         orderId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }
 
     private Order reload(User actor, Long orderId) {
         return orderRepository
-                .findDetailByIdAndCoffeeShopId(
+                .findDetailByIdAndEstablishmentId(
                         orderId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(this::notFound);
     }

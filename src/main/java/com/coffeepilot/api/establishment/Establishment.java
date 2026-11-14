@@ -1,4 +1,4 @@
-package com.coffeepilot.api.coffeeshop;
+package com.coffeepilot.api.establishment;
 
 import jakarta.persistence.Column;
 import jakarta.persistence.Entity;
@@ -13,8 +13,8 @@ import org.hibernate.annotations.UpdateTimestamp;
 import java.time.OffsetDateTime;
 
 @Entity
-@Table(name = "coffee_shops")
-public class CoffeeShop {
+@Table(name = "establishments")
+public class Establishment {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
@@ -34,10 +34,10 @@ public class CoffeeShop {
     @Column(name = "updated_at", nullable = false)
     private OffsetDateTime updatedAt;
 
-    protected CoffeeShop() {
+    protected Establishment() {
     }
 
-    public CoffeeShop(String name) {
+    public Establishment(String name) {
         this.name = name;
     }
 

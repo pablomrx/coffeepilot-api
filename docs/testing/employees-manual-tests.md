@@ -20,9 +20,9 @@ Todos os resultados abaixo são os que foram observados na execução. Onde a ex
 - **Autenticação:** token ausente, falso ou adulterado é sempre 401, com a assinatura validada.
 - **Validação:** os 400 apontam o campo certo, inclusive o limite de 72 bytes da senha, mapeado para `password`.
 - **E-mail:** a normalização acontece antes da checagem de duplicidade.
-- **Isolamento:** a cafeteria vem sempre do usuário autenticado, nunca do corpo da requisição.
-- **Sessão:** usuário ou cafeteria inativos e cargo rebaixado não dão acesso com token antigo, porque o estado vale o do banco.
-- **Campos protegidos:** o cliente não consegue definir `id`, `active` nem cafeteria.
+- **Isolamento:** o estabelecimento vem sempre do usuário autenticado, nunca do corpo da requisição.
+- **Sessão:** usuário ou estabelecimento inativos e cargo rebaixado não dão acesso com token antigo, porque o estado vale o do banco.
+- **Campos protegidos:** o cliente não consegue definir `id`, `active` nem estabelecimento.
 - **Limites:** nome com 150 caracteres e e-mail com 254 são aceitos, e acima disso são rejeitados com 400.
 
 ---
@@ -84,12 +84,12 @@ Conferência no banco: os cadastros negados (`owner3@`, `manager2@`, `negado@`) 
 | T23 | `ATTENDANT@TESTE.COM` (maiúsculas) | 409 | 409 ✅ |
 | T24 | `"  novo@teste.com  "` (com espaços) | 201, sem espaços | 201 ✅ (o banco confirmou `novo@teste.com`) |
 
-### Isolamento por cafeteria
+### Isolamento por estabelecimento
 
 | # | O que foi feito | Esperado | Resultado |
 |---|---|---|---|
-| T25 | Enviar `"coffeeShopId": 1` no corpo | 201, campo ignorado, cafeteria 6 | 201 ✅ (banco: `coffee_shop_id = 6`) |
-| T26 | Conferir a resposta sem `password`, `passwordHash` nem `coffeeShop` | Sem campos sensíveis | ✅ (em todos os 201) |
+| T25 | Enviar `"establishmentId": 1` no corpo | 201, campo ignorado, estabelecimento 6 | 201 ✅ (banco: `establishment_id = 6`) |
+| T26 | Conferir a resposta sem `password`, `passwordHash` nem `establishment` | Sem campos sensíveis | ✅ (em todos os 201) |
 
 ### Estado no banco (token antigo)
 
@@ -98,7 +98,7 @@ Conferência no banco: os cadastros negados (`owner3@`, `manager2@`, `negado@`) 
 | D1 | Dono (id 6) desativado, uso do token antigo do dono | 401/403 | 401 ✅ (o filtro JWT barrou antes do serviço) |
 | D1 (controle) | Login do dono inativo | 401 | 401 ✅ ("Credenciais inválidas.") |
 | D3 | Gerente rebaixado para ATTENDANT no banco, token antigo de MANAGER | 403 | 403 ✅ (vale o cargo do banco) |
-| D2 | Cafeteria 6 desativada, token do dono | 401/403 | 401 ✅ (o filtro JWT barrou) |
+| D2 | Estabelecimento 6 desativado, token do dono | 401/403 | 401 ✅ (o filtro JWT barrou) |
 
 ---
 
@@ -110,7 +110,7 @@ Todos com token de dono, em `POST /employees`.
 |---|---|---|---|
 | T28 | `"role": "attendant"` (minúsculo) | 400, corpo ilegível | 400 ✅ ("Corpo da requisição inválido ou ilegível."); nada criado no banco |
 | T29 | `"role": null` | 400, campo `role` | 400 ✅ ("Dados inválidos.", `role`: "O cargo é obrigatório.") |
-| T30 | Corpo válido com `"id": 1`, `"active": false` e `"coffeeShopId": 1` | 201, campos ignorados | 201 ✅ (`id` 18 gerado pelo banco, `active: true`, nenhum dado de cafeteria na resposta) |
+| T30 | Corpo válido com `"id": 1`, `"active": false` e `"establishmentId": 1` | 201, campos ignorados | 201 ✅ (`id` 18 gerado pelo banco, `active: true`, nenhum dado de estabelecimento na resposta) |
 | T31 | Nome com 151 caracteres | 400, campo `name` | 400 ✅ ("O nome deve ter no máximo 150 caracteres.") |
 | T32 | Nome com 150 caracteres | 201 | 201 ✅ (id 20) |
 | T33 | E-mail com 255 caracteres e formato válido | 400, campo `email` | 400 ✅ ("O e-mail deve ter no máximo 254 caracteres.") |

@@ -29,9 +29,9 @@ public class GlobalExceptionHandler {
 
     private static final String EMAIL_UNIQUE_CONSTRAINT = "uq_users_email";
     private static final String INGREDIENT_NAME_UNIQUE_CONSTRAINT =
-            "uq_ingredients_coffee_shop_name";
+            "uq_ingredients_establishment_name";
     private static final String PRODUCT_NAME_UNIQUE_CONSTRAINT =
-            "uq_products_coffee_shop_name";
+            "uq_products_establishment_name";
     private static final String REVERSAL_UNIQUE_CONSTRAINT =
             "uq_stock_movements_reverses_movement";
     private static final String INITIAL_UNIQUE_CONSTRAINT =

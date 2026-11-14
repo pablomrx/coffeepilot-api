@@ -171,12 +171,12 @@ public class StockService {
             );
         }
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         StockMovement original = movementRepository
-                .findByIdAndCoffeeShopId(
+                .findByIdAndEstablishmentId(
                         movementId,
-                        coffeeShopId
+                        establishmentId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Movimentação não encontrada."
@@ -208,9 +208,9 @@ public class StockService {
         );
 
         if (movementRepository
-                .existsByReversesMovementIdAndCoffeeShopId(
+                .existsByReversesMovementIdAndEstablishmentId(
                         original.getId(),
-                        coffeeShopId
+                        establishmentId
                 )) {
             throw new BusinessConflictException(
                     "Esta movimentação já foi estornada."
@@ -239,19 +239,19 @@ public class StockService {
                 STOCK_ROLES
         );
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         ingredientRepository
-                .findByIdAndCoffeeShopId(
+                .findByIdAndEstablishmentId(
                         ingredientId,
-                        coffeeShopId
+                        establishmentId
                 )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ingrediente não encontrado."
                 ));
 
         return movementRepository.findHistory(
-                coffeeShopId,
+                establishmentId,
                 ingredientId,
                 sanitize(pageable)
         );
@@ -276,9 +276,9 @@ public class StockService {
         }
 
         if (movementRepository
-                .existsByIngredientIdAndCoffeeShopId(
+                .existsByIngredientIdAndEstablishmentId(
                         ingredient.getId(),
-                        ingredient.getCoffeeShopId()
+                        ingredient.getEstablishmentId()
                 )) {
             throw new BusinessConflictException(
                     "O ingrediente já possui movimentações."
@@ -336,14 +336,14 @@ public class StockService {
             }
         }
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         List<Long> ids = requiredByIngredient.keySet().stream()
                 .sorted()
                 .toList();
 
         List<Ingredient> locked =
-                ingredientRepository.findAllByIdsForUpdate(coffeeShopId, ids);
+                ingredientRepository.findAllByIdsForUpdate(establishmentId, ids);
 
         if (locked.size() != ids.size()) {
             throw new BusinessRuleException(
@@ -418,10 +418,10 @@ public class StockService {
             );
         }
 
-        Long coffeeShopId = actor.getCoffeeShop().getId();
+        Long establishmentId = actor.getEstablishment().getId();
 
         List<StockConsumptionLine> lines = movementRepository
-                .findConsumptionLinesByOrder(coffeeShopId, orderId);
+                .findConsumptionLinesByOrder(establishmentId, orderId);
 
         if (lines.isEmpty()) {
             return List.of();
@@ -434,7 +434,7 @@ public class StockService {
                 .toList();
 
         List<Ingredient> locked =
-                ingredientRepository.findAllByIdsForUpdate(coffeeShopId, ids);
+                ingredientRepository.findAllByIdsForUpdate(establishmentId, ids);
 
         if (locked.size() != ids.size()) {
             throw new BusinessRuleException(
@@ -455,15 +455,15 @@ public class StockService {
         }
 
         List<StockMovement> consumptions = movementRepository
-                .findConsumptionsByOrder(coffeeShopId, orderId);
+                .findConsumptionsByOrder(establishmentId, orderId);
 
         List<StockMovement> reversals = new ArrayList<>();
 
         for (StockMovement consumption : consumptions) {
             if (movementRepository
-                    .existsByReversesMovementIdAndCoffeeShopId(
+                    .existsByReversesMovementIdAndEstablishmentId(
                             consumption.getId(),
-                            coffeeShopId
+                            establishmentId
                     )) {
                 throw new BusinessConflictException(
                         "O consumo deste pedido já foi estornado."
@@ -516,9 +516,9 @@ public class StockService {
             Long ingredientId
     ) {
         Ingredient ingredient = ingredientRepository
-                .findByIdAndCoffeeShopIdForUpdate(
+                .findByIdAndEstablishmentIdForUpdate(
                         ingredientId,
-                        actor.getCoffeeShop().getId()
+                        actor.getEstablishment().getId()
                 )
                 .orElseThrow(() -> new ResourceNotFoundException(
                         "Ingrediente não encontrado."
@@ -648,7 +648,7 @@ public class StockService {
 
         try {
             movement = new StockMovement(
-                    actor.getCoffeeShop(),
+                    actor.getEstablishment(),
                     ingredient,
                     type,
                     delta,

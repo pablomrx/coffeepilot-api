@@ -1,4 +1,3 @@
-
 package com.coffeepilot.api.auth;
 
 import com.coffeepilot.api.user.User;
@@ -63,7 +62,7 @@ public class AuthenticationService {
                 || !passwordWithinLimit
                 || !passwordMatches
                 || !user.isActive()
-                || !user.getCoffeeShop().isActive()) {
+                || !user.getEstablishment().isActive()) {
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 

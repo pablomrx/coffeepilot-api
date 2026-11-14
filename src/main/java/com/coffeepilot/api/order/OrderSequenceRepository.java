@@ -18,20 +18,20 @@ public interface OrderSequenceRepository
     // a primeira e não faz nada.
     @Modifying
     @Query(value = """
-            INSERT INTO order_sequences (coffee_shop_id, last_number)
-            VALUES (:coffeeShopId, 0)
-            ON CONFLICT (coffee_shop_id) DO NOTHING
+            INSERT INTO order_sequences (establishment_id, last_number)
+            VALUES (:establishmentId, 0)
+            ON CONFLICT (establishment_id) DO NOTHING
             """, nativeQuery = true)
-    int createIfMissing(@Param("coffeeShopId") Long coffeeShopId);
+    int createIfMissing(@Param("establishmentId") Long establishmentId);
 
     // Bloqueia o contador até o fim da transação. Deve ser o último
     // bloqueio da criação do pedido, para segurá-lo pelo menor tempo.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT s FROM OrderSequence s
-            WHERE s.coffeeShopId = :coffeeShopId
+            WHERE s.establishmentId = :establishmentId
             """)
     Optional<OrderSequence> findForUpdate(
-            @Param("coffeeShopId") Long coffeeShopId
+            @Param("establishmentId") Long establishmentId
     );
 }

@@ -15,10 +15,10 @@ import java.util.Optional;
 
 public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
 
-    // Busca um ingrediente pertencente a uma cafeteria específica.
-    Optional<Ingredient> findByIdAndCoffeeShopId(
+    // Busca um ingrediente pertencente a um estabelecimento específico.
+    Optional<Ingredient> findByIdAndEstablishmentId(
             Long id,
-            Long coffeeShopId
+            Long establishmentId
     );
 
     // Busca e bloqueia um ingrediente para operações de estoque.
@@ -26,55 +26,55 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
     @Query("""
             SELECT i FROM Ingredient i
             WHERE i.id = :id
-              AND i.coffeeShopId = :coffeeShopId
+              AND i.establishmentId = :establishmentId
             """)
-    Optional<Ingredient> findByIdAndCoffeeShopIdForUpdate(
+    Optional<Ingredient> findByIdAndEstablishmentIdForUpdate(
             @Param("id") Long id,
-            @Param("coffeeShopId") Long coffeeShopId
+            @Param("establishmentId") Long establishmentId
     );
 
     // Busca e bloqueia vários ingredientes em ordem crescente de ID.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT i FROM Ingredient i
-            WHERE i.coffeeShopId = :coffeeShopId
+            WHERE i.establishmentId = :establishmentId
               AND i.id IN :ids
             ORDER BY i.id
             """)
     List<Ingredient> findAllByIdsForUpdate(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("ids") Collection<Long> ids
     );
 
-    // Verifica se já existe um ingrediente com o mesmo nome na cafeteria.
+    // Verifica se já existe um ingrediente com o mesmo nome no estabelecimento.
     @Query("""
             SELECT COUNT(i) > 0 FROM Ingredient i
-            WHERE i.coffeeShopId = :coffeeShopId
+            WHERE i.establishmentId = :establishmentId
               AND LOWER(TRIM(i.name)) = LOWER(TRIM(:name))
             """)
     boolean existsByName(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("name") String name
     );
 
     // Verifica duplicidade, ignorando o próprio ingrediente durante uma edição.
     @Query("""
             SELECT COUNT(i) > 0 FROM Ingredient i
-            WHERE i.coffeeShopId = :coffeeShopId
+            WHERE i.establishmentId = :establishmentId
               AND i.id <> :excludedId
               AND LOWER(TRIM(i.name)) = LOWER(TRIM(:name))
             """)
     boolean existsByNameExcludingId(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("excludedId") Long excludedId,
             @Param("name") String name
     );
 
-    // Lista ingredientes de uma cafeteria com filtros opcionais e paginação.
+    // Lista ingredientes de um estabelecimento com filtros opcionais e paginação.
     @Query(
             value = """
                     SELECT i FROM Ingredient i
-                    WHERE i.coffeeShopId = :coffeeShopId
+                    WHERE i.establishmentId = :establishmentId
                       AND (
                           CAST(:active AS Boolean) IS NULL
                           OR i.active = :active
@@ -90,7 +90,7 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
                     """,
             countQuery = """
                     SELECT COUNT(i) FROM Ingredient i
-                    WHERE i.coffeeShopId = :coffeeShopId
+                    WHERE i.establishmentId = :establishmentId
                       AND (
                           CAST(:active AS Boolean) IS NULL
                           OR i.active = :active
@@ -106,7 +106,7 @@ public interface IngredientRepository extends JpaRepository<Ingredient, Long> {
                     """
     )
     Page<Ingredient> findByFilters(
-            @Param("coffeeShopId") Long coffeeShopId,
+            @Param("establishmentId") Long establishmentId,
             @Param("active") Boolean active,
             @Param("lowStock") boolean lowStock,
             Pageable pageable

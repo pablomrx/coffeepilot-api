@@ -58,7 +58,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         }
 
         Optional<User> userOptional =
-                userRepository.findWithCoffeeShopById(userId.get());
+                userRepository.findWithEstablishmentById(userId.get());
 
         if (userOptional.isEmpty()) {
             return;
@@ -66,7 +66,7 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
         User user = userOptional.get();
 
-        if (!user.isActive() || !user.getCoffeeShop().isActive()) {
+        if (!user.isActive() || !user.getEstablishment().isActive()) {
             return;
         }
 

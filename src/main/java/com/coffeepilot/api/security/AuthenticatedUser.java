@@ -8,8 +8,8 @@ public record AuthenticatedUser(
         String name,
         String email,
         Role role,
-        Long coffeeShopId,
-        String coffeeShopName
+        Long establishmentId,
+        String establishmentName
 ) {
 
     public static AuthenticatedUser from(User user) {
@@ -18,8 +18,8 @@ public record AuthenticatedUser(
                 user.getName(),
                 user.getEmail(),
                 user.getRole(),
-                user.getCoffeeShop().getId(),
-                user.getCoffeeShop().getName()
+                user.getEstablishment().getId(),
+                user.getEstablishment().getName()
         );
     }
 }

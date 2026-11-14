@@ -38,7 +38,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.InsufficientStockException;
@@ -58,7 +58,7 @@ import com.coffeepilot.api.user.UserRepository;
 class StockServiceTest {
 
     private static final Long USER_ID = 1L;
-    private static final Long COFFEE_SHOP_ID = 10L;
+    private static final Long ESTABLISHMENT_ID = 10L;
     private static final Long INGREDIENT_ID = 1L;
     private static final Long ORDER_ID = 55L;
 
@@ -69,7 +69,7 @@ class StockServiceTest {
     @Captor ArgumentCaptor<Collection<Long>> idsCaptor;
 
     private StockService service;
-    private CoffeeShop shop;
+    private Establishment shop;
     private User actor;
 
     @BeforeEach
@@ -79,14 +79,14 @@ class StockServiceTest {
                 ingredientRepository,
                 movementRepository);
 
-        shop = mock(CoffeeShop.class);
-        lenient().when(shop.getId()).thenReturn(COFFEE_SHOP_ID);
+        shop = mock(Establishment.class);
+        lenient().when(shop.getId()).thenReturn(ESTABLISHMENT_ID);
         lenient().when(shop.isActive()).thenReturn(true);
 
         actor = mock(User.class);
         lenient().when(actor.isActive()).thenReturn(true);
-        lenient().when(actor.getCoffeeShop()).thenReturn(shop);
-        lenient().when(userRepository.findWithCoffeeShopById(USER_ID))
+        lenient().when(actor.getEstablishment()).thenReturn(shop);
+        lenient().when(userRepository.findWithEstablishmentById(USER_ID))
                 .thenReturn(Optional.of(actor));
     }
 
@@ -95,7 +95,7 @@ class StockServiceTest {
     private AuthenticatedUser auth() {
         return new AuthenticatedUser(
                 USER_ID, "Ana", "ana@x.com", Role.OWNER,
-                COFFEE_SHOP_ID, "Cafeteria Teste");
+                ESTABLISHMENT_ID, "Estabelecimento Teste");
     }
 
     /** O papel vale o do banco (usuário recarregado), não o do token. */
@@ -110,7 +110,7 @@ class StockServiceTest {
     private Ingredient ingredientWithId(
             Long id, String name, IngredientUnit unit, String balance) {
         Ingredient ingredient =
-                new Ingredient(COFFEE_SHOP_ID, name, unit, BigDecimal.ZERO);
+                new Ingredient(ESTABLISHMENT_ID, name, unit, BigDecimal.ZERO);
         ReflectionTestUtils.setField(ingredient, "id", id);
 
         BigDecimal value = new BigDecimal(balance);
@@ -121,14 +121,14 @@ class StockServiceTest {
     }
 
     private void lockFinds(Ingredient ingredient) {
-        when(ingredientRepository.findByIdAndCoffeeShopIdForUpdate(
-                INGREDIENT_ID, COFFEE_SHOP_ID))
+        when(ingredientRepository.findByIdAndEstablishmentIdForUpdate(
+                INGREDIENT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(ingredient));
     }
 
     private void lockMany(List<Ingredient> ingredients) {
         when(ingredientRepository.findAllByIdsForUpdate(
-                eq(COFFEE_SHOP_ID), any()))
+                eq(ESTABLISHMENT_ID), any()))
                 .thenReturn(ingredients);
     }
 
@@ -311,10 +311,10 @@ class StockServiceTest {
     }
 
     @Test
-    void entradaEmIngredienteDeOutraCafeteriaRetornaNaoEncontrado() {
+    void entradaEmIngredienteDeOutroEstabelecimentoRetornaNaoEncontrado() {
         actingAs(Role.OWNER);
-        when(ingredientRepository.findByIdAndCoffeeShopIdForUpdate(
-                INGREDIENT_ID, COFFEE_SHOP_ID))
+        when(ingredientRepository.findByIdAndEstablishmentIdForUpdate(
+                INGREDIENT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.registerEntry(
@@ -383,7 +383,7 @@ class StockServiceTest {
                 .isInstanceOf(BusinessRuleException.class);
 
         verify(ingredientRepository, never())
-                .findByIdAndCoffeeShopIdForUpdate(any(), any());
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     @ParameterizedTest
@@ -398,7 +398,7 @@ class StockServiceTest {
                 .isInstanceOf(BusinessRuleException.class);
 
         verify(ingredientRepository, never())
-                .findByIdAndCoffeeShopIdForUpdate(any(), any());
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     @Test
@@ -446,11 +446,11 @@ class StockServiceTest {
         StockMovement original = persistedMovement(
                 5L, ingredient, StockMovementType.ENTRY, "500", "1500");
 
-        when(movementRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(original));
         lockFinds(ingredient);
-        when(movementRepository.existsByReversesMovementIdAndCoffeeShopId(
-                5L, COFFEE_SHOP_ID)).thenReturn(false);
+        when(movementRepository.existsByReversesMovementIdAndEstablishmentId(
+                5L, ESTABLISHMENT_ID)).thenReturn(false);
         saveEchoesArgument();
 
         service.reverse(auth(), 5L, "Entrada em duplicidade");
@@ -475,15 +475,15 @@ class StockServiceTest {
         assertThatThrownBy(() -> service.reverse(auth(), 5L, description))
                 .isInstanceOf(BusinessRuleException.class);
 
-        verify(movementRepository, never()).findByIdAndCoffeeShopId(any(), any());
+        verify(movementRepository, never()).findByIdAndEstablishmentId(any(), any());
         verify(ingredientRepository, never())
-                .findByIdAndCoffeeShopIdForUpdate(any(), any());
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     @Test
-    void estornoDeMovimentacaoInexistenteOuDeOutraCafeteriaRetornaNaoEncontrado() {
+    void estornoDeMovimentacaoInexistenteOuDeOutroEstabelecimentoRetornaNaoEncontrado() {
         actingAs(Role.OWNER);
-        when(movementRepository.findByIdAndCoffeeShopId(99L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.reverse(auth(), 99L, "Motivo"))
@@ -495,7 +495,7 @@ class StockServiceTest {
         actingAs(Role.OWNER);
         StockMovement reversal = mock(StockMovement.class);
         when(reversal.getType()).thenReturn(StockMovementType.REVERSAL);
-        when(movementRepository.findByIdAndCoffeeShopId(7L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(7L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(reversal));
 
         assertThatThrownBy(() -> service.reverse(auth(), 7L, "Motivo"))
@@ -509,7 +509,7 @@ class StockServiceTest {
         actingAs(Role.OWNER);
         StockMovement initial = mock(StockMovement.class);
         when(initial.getType()).thenReturn(StockMovementType.INITIAL);
-        when(movementRepository.findByIdAndCoffeeShopId(1L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(1L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(initial));
 
         assertThatThrownBy(() -> service.reverse(auth(), 1L, "Motivo"))
@@ -523,7 +523,7 @@ class StockServiceTest {
         actingAs(Role.OWNER);
         StockMovement consumption = mock(StockMovement.class);
         when(consumption.getType()).thenReturn(StockMovementType.CONSUMPTION);
-        when(movementRepository.findByIdAndCoffeeShopId(8L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(8L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(consumption));
 
         assertThatThrownBy(() -> service.reverse(auth(), 8L, "Motivo"))
@@ -532,7 +532,7 @@ class StockServiceTest {
                         + "ser estornadas manualmente. Cancele o pedido.");
 
         verify(ingredientRepository, never())
-                .findByIdAndCoffeeShopIdForUpdate(any(), any());
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
         verify(movementRepository, never()).saveAndFlush(any());
     }
 
@@ -543,11 +543,11 @@ class StockServiceTest {
         StockMovement original = persistedMovement(
                 5L, ingredient, StockMovementType.ENTRY, "500", "1500");
 
-        when(movementRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(original));
         lockFinds(ingredient);
-        when(movementRepository.existsByReversesMovementIdAndCoffeeShopId(
-                5L, COFFEE_SHOP_ID)).thenReturn(true);
+        when(movementRepository.existsByReversesMovementIdAndEstablishmentId(
+                5L, ESTABLISHMENT_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.reverse(auth(), 5L, "Motivo"))
                 .isInstanceOf(BusinessConflictException.class);
@@ -563,7 +563,7 @@ class StockServiceTest {
                 5L, ingredient, StockMovementType.ENTRY, "500", "1500");
         ingredient.deactivate();
 
-        when(movementRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(original));
         lockFinds(ingredient);
 
@@ -578,11 +578,11 @@ class StockServiceTest {
         StockMovement original = persistedMovement(
                 5L, ingredient, StockMovementType.ENTRY, "500", "700");
 
-        when(movementRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(movementRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(original));
         lockFinds(ingredient);
-        when(movementRepository.existsByReversesMovementIdAndCoffeeShopId(
-                5L, COFFEE_SHOP_ID)).thenReturn(false);
+        when(movementRepository.existsByReversesMovementIdAndEstablishmentId(
+                5L, ESTABLISHMENT_ID)).thenReturn(false);
 
         assertThatThrownBy(() -> service.reverse(auth(), 5L, "Motivo"))
                 .isInstanceOf(BusinessConflictException.class);
@@ -599,7 +599,7 @@ class StockServiceTest {
         assertThatThrownBy(() -> service.reverse(auth(), 5L, "Motivo"))
                 .isInstanceOf(AccessDeniedException.class);
 
-        verify(movementRepository, never()).findByIdAndCoffeeShopId(any(), any());
+        verify(movementRepository, never()).findByIdAndEstablishmentId(any(), any());
     }
 
     // ---------- saldo inicial ----------
@@ -607,8 +607,8 @@ class StockServiceTest {
     @Test
     void saldoInicialRegistraMovimentacaoInitial() {
         Ingredient ingredient = ingredient(IngredientUnit.G, "0");
-        when(movementRepository.existsByIngredientIdAndCoffeeShopId(
-                INGREDIENT_ID, COFFEE_SHOP_ID)).thenReturn(false);
+        when(movementRepository.existsByIngredientIdAndEstablishmentId(
+                INGREDIENT_ID, ESTABLISHMENT_ID)).thenReturn(false);
         saveEchoesArgument();
 
         service.registerInitial(actor, ingredient, new BigDecimal("500"));
@@ -625,8 +625,8 @@ class StockServiceTest {
     @Test
     void saldoInicialEmIngredienteComMovimentacoesGeraConflito() {
         Ingredient ingredient = ingredient(IngredientUnit.G, "0");
-        when(movementRepository.existsByIngredientIdAndCoffeeShopId(
-                INGREDIENT_ID, COFFEE_SHOP_ID)).thenReturn(true);
+        when(movementRepository.existsByIngredientIdAndEstablishmentId(
+                INGREDIENT_ID, ESTABLISHMENT_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.registerInitial(
                 actor, ingredient, new BigDecimal("500")))
@@ -712,7 +712,7 @@ class StockServiceTest {
                 actor, ORDER_ID, null, required(3L, "1", 1L, "1"));
 
         verify(ingredientRepository).findAllByIdsForUpdate(
-                eq(COFFEE_SHOP_ID), idsCaptor.capture());
+                eq(ESTABLISHMENT_ID), idsCaptor.capture());
         assertThat(idsCaptor.getValue()).containsExactly(1L, 3L);
 
         assertThat(savedMovements(2))
@@ -851,11 +851,11 @@ class StockServiceTest {
         Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "70");
         StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
 
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(
                         new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
         lockMany(List.of(cafe));
-        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionsByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(consumo));
         saveEchoesArgument();
 
@@ -880,11 +880,11 @@ class StockServiceTest {
         StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
         cafe.deactivate();
 
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(
                         new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
         lockMany(List.of(cafe));
-        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionsByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(consumo));
         saveEchoesArgument();
 
@@ -901,19 +901,19 @@ class StockServiceTest {
         StockMovement consumoCafe = consumption(10L, cafe, "-30", "70", ORDER_ID);
         StockMovement consumoLeite = consumption(11L, leite, "-150", "350", ORDER_ID);
 
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(
                         new StockConsumptionLine(10L, 1L, new BigDecimal("-30")),
                         new StockConsumptionLine(11L, 2L, new BigDecimal("-150"))));
         lockMany(List.of(cafe, leite));
-        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionsByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(consumoCafe, consumoLeite));
         saveEchoesArgument();
 
         service.reverseOrderConsumption(actor, ORDER_ID, "Cancelamento do pedido");
 
         verify(ingredientRepository).findAllByIdsForUpdate(
-                eq(COFFEE_SHOP_ID), idsCaptor.capture());
+                eq(ESTABLISHMENT_ID), idsCaptor.capture());
         assertThat(idsCaptor.getValue()).containsExactly(1L, 2L);
 
         List<StockMovement> saved = savedMovements(2);
@@ -926,7 +926,7 @@ class StockServiceTest {
 
     @Test
     void cancelamentoDePedidoSemConsumoNaoFazNada() {
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of());
 
         List<StockMovement> result = service.reverseOrderConsumption(
@@ -942,14 +942,14 @@ class StockServiceTest {
         Ingredient cafe = ingredientWithId(1L, "Café", IngredientUnit.G, "100");
         StockMovement consumo = consumption(10L, cafe, "-30", "70", ORDER_ID);
 
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(
                         new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
         lockMany(List.of(cafe));
-        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionsByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(consumo));
-        when(movementRepository.existsByReversesMovementIdAndCoffeeShopId(
-                10L, COFFEE_SHOP_ID)).thenReturn(true);
+        when(movementRepository.existsByReversesMovementIdAndEstablishmentId(
+                10L, ESTABLISHMENT_ID)).thenReturn(true);
 
         assertThatThrownBy(() -> service.reverseOrderConsumption(
                 actor, ORDER_ID, "Cancelamento do pedido"))
@@ -980,11 +980,11 @@ class StockServiceTest {
         StockMovement consumo = consumption(
                 10L, cafe, "-30", "99999999999", ORDER_ID);
 
-        when(movementRepository.findConsumptionLinesByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionLinesByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(
                         new StockConsumptionLine(10L, 1L, new BigDecimal("-30"))));
         lockMany(List.of(cafe));
-        when(movementRepository.findConsumptionsByOrder(COFFEE_SHOP_ID, ORDER_ID))
+        when(movementRepository.findConsumptionsByOrder(ESTABLISHMENT_ID, ORDER_ID))
                 .thenReturn(List.of(consumo));
 
         assertThatThrownBy(() -> service.reverseOrderConsumption(
@@ -998,18 +998,18 @@ class StockServiceTest {
 
     private Pageable historyPageable(Pageable input) {
         actingAs(Role.STOCKIST);
-        when(ingredientRepository.findByIdAndCoffeeShopId(
-                INGREDIENT_ID, COFFEE_SHOP_ID))
+        when(ingredientRepository.findByIdAndEstablishmentId(
+                INGREDIENT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(ingredient(IngredientUnit.G, "0")));
         when(movementRepository.findHistory(
-                eq(COFFEE_SHOP_ID), eq(INGREDIENT_ID), any(Pageable.class)))
+                eq(ESTABLISHMENT_ID), eq(INGREDIENT_ID), any(Pageable.class)))
                 .thenReturn(Page.empty());
 
         service.history(auth(), INGREDIENT_ID, input);
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
         verify(movementRepository).findHistory(
-                eq(COFFEE_SHOP_ID), eq(INGREDIENT_ID), captor.capture());
+                eq(ESTABLISHMENT_ID), eq(INGREDIENT_ID), captor.capture());
         return captor.getValue();
     }
 
@@ -1045,10 +1045,10 @@ class StockServiceTest {
     }
 
     @Test
-    void historicoDeIngredienteDeOutraCafeteriaRetornaNaoEncontrado() {
+    void historicoDeIngredienteDeOutroEstabelecimentoRetornaNaoEncontrado() {
         actingAs(Role.OWNER);
-        when(ingredientRepository.findByIdAndCoffeeShopId(
-                INGREDIENT_ID, COFFEE_SHOP_ID))
+        when(ingredientRepository.findByIdAndEstablishmentId(
+                INGREDIENT_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.history(

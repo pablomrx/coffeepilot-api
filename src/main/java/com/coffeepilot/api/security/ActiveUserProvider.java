@@ -29,13 +29,13 @@ public class ActiveUserProvider {
         }
 
         User user = userRepository
-                .findWithCoffeeShopById(authenticatedUser.userId())
+                .findWithEstablishmentById(authenticatedUser.userId())
                 .orElseThrow(() -> new AuthenticationCredentialsNotFoundException(
                         "Usuário autenticado não foi encontrado."));
 
-        if (!user.isActive() || !user.getCoffeeShop().isActive()) {
+        if (!user.isActive() || !user.getEstablishment().isActive()) {
             throw new AccessDeniedException(
-                    "Usuário ou cafeteria inativa.");
+                    "Usuário ou estabelecimento inativo.");
         }
 
         if (!List.of(allowedRoles).contains(user.getRole())) {

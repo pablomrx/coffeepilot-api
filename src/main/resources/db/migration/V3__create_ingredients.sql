@@ -1,7 +1,7 @@
 CREATE TABLE ingredients (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    coffee_shop_id BIGINT NOT NULL,
+    establishment_id BIGINT NOT NULL,
 
     name VARCHAR(150) NOT NULL,
     unit VARCHAR(10) NOT NULL,
@@ -14,9 +14,9 @@ CREATE TABLE ingredients (
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_ingredients_coffee_shop
-        FOREIGN KEY (coffee_shop_id)
-        REFERENCES coffee_shops (id),
+    CONSTRAINT fk_ingredients_establishment
+        FOREIGN KEY (establishment_id)
+        REFERENCES establishments (id),
 
     CONSTRAINT ck_ingredients_name_not_blank
         CHECK (BTRIM(name) <> ''),
@@ -39,12 +39,12 @@ CREATE TABLE ingredients (
             )
         ),
 
-    CONSTRAINT uq_ingredients_id_coffee_shop
-        UNIQUE (id, coffee_shop_id)
+    CONSTRAINT uq_ingredients_id_establishment
+        UNIQUE (id, establishment_id)
 );
 
-CREATE UNIQUE INDEX uq_ingredients_coffee_shop_name
-    ON ingredients (coffee_shop_id, LOWER(BTRIM(name)));
+CREATE UNIQUE INDEX uq_ingredients_establishment_name
+    ON ingredients (establishment_id, LOWER(BTRIM(name)));
 
-CREATE INDEX idx_ingredients_coffee_shop_active
-    ON ingredients (coffee_shop_id, is_active);
+CREATE INDEX idx_ingredients_establishment_active
+    ON ingredients (establishment_id, is_active);

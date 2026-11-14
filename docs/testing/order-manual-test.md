@@ -336,15 +336,15 @@ Resultado: 0 linhas ✅
 **V3: o contador de numeração acompanha o maior número registrado**
 
 ```sql
-SELECT s.coffee_shop_id, s.last_number,
+SELECT s.establishment_id, s.last_number,
        MAX(o.order_number) AS maior_numero, COUNT(o.id) AS pedidos
 FROM order_sequences s
-JOIN orders o ON o.coffee_shop_id = s.coffee_shop_id
-GROUP BY s.coffee_shop_id, s.last_number
-ORDER BY s.coffee_shop_id;
+JOIN orders o ON o.establishment_id = s.establishment_id
+GROUP BY s.establishment_id, s.last_number
+ORDER BY s.establishment_id;
 ```
 
-| coffee_shop_id | last_number | maior_numero | pedidos |
+| establishment_id | last_number | maior_numero | pedidos |
 |---|---|---|---|
 | 1 | 7 | 7 | 7 |
 | 2 | 1 | 1 | 1 |
@@ -355,22 +355,22 @@ A consulta abaixo verifica individualmente todos os números esperados na sequê
 
 ```sql
 SELECT
-    s.coffee_shop_id,
+    s.establishment_id,
     numbers.order_number AS missing_number
 FROM order_sequences s
 CROSS JOIN LATERAL generate_series(1, s.last_number)
     AS numbers(order_number)
 LEFT JOIN orders o
-    ON o.coffee_shop_id = s.coffee_shop_id
+    ON o.establishment_id = s.establishment_id
    AND o.order_number = numbers.order_number
 WHERE o.id IS NULL
-ORDER BY s.coffee_shop_id, numbers.order_number;
+ORDER BY s.establishment_id, numbers.order_number;
 ```
 
 Resultado:
 
 ```text
- coffee_shop_id | missing_number
+ establishment_id | missing_number
 ----------------+----------------
 (0 rows)
 ```
@@ -422,7 +422,7 @@ Resultado: 0 linhas ✅
 SELECT m.id
 FROM stock_movements m
 JOIN orders o ON o.id = m.order_id
-WHERE o.coffee_shop_id <> m.coffee_shop_id;
+WHERE o.establishment_id <> m.establishment_id;
 ```
 
 Resultado: 0 linhas ✅

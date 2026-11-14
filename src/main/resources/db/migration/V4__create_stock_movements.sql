@@ -1,7 +1,7 @@
 CREATE TABLE stock_movements (
     id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
 
-    coffee_shop_id BIGINT NOT NULL,
+    establishment_id BIGINT NOT NULL,
     ingredient_id BIGINT NOT NULL,
 
     type VARCHAR(20) NOT NULL,
@@ -20,21 +20,21 @@ CREATE TABLE stock_movements (
 
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
-    CONSTRAINT fk_stock_movements_coffee_shop
-        FOREIGN KEY (coffee_shop_id)
-        REFERENCES coffee_shops (id),
+    CONSTRAINT fk_stock_movements_establishment
+        FOREIGN KEY (establishment_id)
+        REFERENCES establishments (id),
 
     CONSTRAINT fk_stock_movements_ingredient
-        FOREIGN KEY (ingredient_id, coffee_shop_id)
-        REFERENCES ingredients (id, coffee_shop_id),
+        FOREIGN KEY (ingredient_id, establishment_id)
+        REFERENCES ingredients (id, establishment_id),
 
     CONSTRAINT fk_stock_movements_created_by
-        FOREIGN KEY (created_by, coffee_shop_id)
-        REFERENCES users (id, coffee_shop_id),
+        FOREIGN KEY (created_by, establishment_id)
+        REFERENCES users (id, establishment_id),
 
     CONSTRAINT fk_stock_movements_reverses_movement
-        FOREIGN KEY (reverses_movement_id, coffee_shop_id)
-        REFERENCES stock_movements (id, coffee_shop_id),
+        FOREIGN KEY (reverses_movement_id, establishment_id)
+        REFERENCES stock_movements (id, establishment_id),
 
     CONSTRAINT ck_stock_movements_type
         CHECK (
@@ -147,8 +147,8 @@ CREATE TABLE stock_movements (
             OR type = 'REVERSAL'
         ),
 
-    CONSTRAINT uq_stock_movements_id_coffee_shop
-        UNIQUE (id, coffee_shop_id)
+    CONSTRAINT uq_stock_movements_id_establishment
+        UNIQUE (id, establishment_id)
 );
 
 CREATE UNIQUE INDEX uq_stock_movements_reverses_movement
@@ -165,19 +165,19 @@ CREATE UNIQUE INDEX uq_stock_movements_consumption_per_order_ingredient
 
 CREATE INDEX idx_stock_movements_ingredient_history
     ON stock_movements (
-        coffee_shop_id,
+        establishment_id,
         ingredient_id,
         created_at DESC,
         id DESC
     );
 
-CREATE INDEX idx_stock_movements_coffee_shop_date
+CREATE INDEX idx_stock_movements_establishment_date
     ON stock_movements (
-        coffee_shop_id,
+        establishment_id,
         created_at DESC,
         id DESC
     );
 
 CREATE INDEX idx_stock_movements_order
-    ON stock_movements (coffee_shop_id, order_id)
+    ON stock_movements (establishment_id, order_id)
     WHERE order_id IS NOT NULL;

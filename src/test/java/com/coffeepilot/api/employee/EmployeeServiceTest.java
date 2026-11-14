@@ -22,7 +22,7 @@ import org.mockito.junit.jupiter.MockitoExtension;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.crypto.password.PasswordEncoder;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.EmailAlreadyUsedException;
 import com.coffeepilot.api.employee.dto.CreateEmployeeRequest;
 import com.coffeepilot.api.security.AuthenticatedUser;
@@ -48,7 +48,7 @@ class EmployeeServiceTest {
                 "creator@x.com",
                 tokenRole,
                 10L,
-                "Cafeteria Teste");
+                "Estabelecimento Teste");
     }
 
     private CreateEmployeeRequest request(Role role) {
@@ -57,15 +57,15 @@ class EmployeeServiceTest {
 
     /** lenient: alguns testes saem antes de usar todos os stubs. */
     private User creator(Role role, boolean userActive, boolean shopActive) {
-        CoffeeShop shop = mock(CoffeeShop.class);
+        Establishment shop = mock(Establishment.class);
         lenient().when(shop.isActive()).thenReturn(shopActive);
 
         User creator = mock(User.class);
         lenient().when(creator.getRole()).thenReturn(role);
         lenient().when(creator.isActive()).thenReturn(userActive);
-        lenient().when(creator.getCoffeeShop()).thenReturn(shop);
+        lenient().when(creator.getEstablishment()).thenReturn(shop);
 
-        when(userRepository.findWithCoffeeShopById(CREATOR_ID))
+        when(userRepository.findWithEstablishmentById(CREATOR_ID))
                 .thenReturn(Optional.of(creator));
         return creator;
     }
@@ -141,7 +141,7 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void cafeteriaInativaEhNegada() {
+    void estabelecimentoInativoEhNegado() {
         creator(Role.OWNER, true, false);
 
         assertThatThrownBy(() -> service.create(auth(Role.OWNER), request(Role.ATTENDANT)))
@@ -151,7 +151,7 @@ class EmployeeServiceTest {
 
     @Test
     void usuarioAutenticadoInexistenteLancaIllegalState() {
-        when(userRepository.findWithCoffeeShopById(CREATOR_ID)).thenReturn(Optional.empty());
+        when(userRepository.findWithEstablishmentById(CREATOR_ID)).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.create(auth(Role.OWNER), request(Role.ATTENDANT)))
                 .isInstanceOf(IllegalStateException.class);
@@ -170,7 +170,7 @@ class EmployeeServiceTest {
     }
 
     @Test
-    void caminhoFelizSalvaComSenhaHasheadaENaCafeteriaDoCreator() {
+    void caminhoFelizSalvaComSenhaHasheadaENoEstabelecimentoDoCreator() {
         User creator = creator(Role.OWNER, true, true);
         when(passwordEncoder.encode("senha1234")).thenReturn("HASH");
         when(userRepository.saveAndFlush(any(User.class)))
@@ -184,7 +184,7 @@ class EmployeeServiceTest {
 
         assertThat(saved.getPasswordHash()).isEqualTo("HASH");
         assertThat(saved.getPasswordHash()).isNotEqualTo("senha1234");
-        assertThat(saved.getCoffeeShop()).isSameAs(creator.getCoffeeShop());
+        assertThat(saved.getEstablishment()).isSameAs(creator.getEstablishment());
         assertThat(saved.getEmail()).isEqualTo("ana@x.com");
         assertThat(saved.getRole()).isEqualTo(Role.ATTENDANT);
     }

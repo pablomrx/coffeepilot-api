@@ -1,6 +1,6 @@
 # Testes manuais: endpoints de receitas
 
-Registro dos testes manuais feitos no Postman contra os endpoints de receitas do CoffeePilot: consulta e substituição da receita de um produto. O documento cobre a troca atômica dos itens, validação do corpo, regras de negócio (ingrediente repetido, inativo, de outro estabelecimento e quantidade por unidade), permissões, isolamento entre cafeterias e o estado do banco.
+Registro dos testes manuais feitos no Postman contra os endpoints de receitas do CoffeePilot: consulta e substituição da receita de um produto. O documento cobre a troca atômica dos itens, validação do corpo, regras de negócio (ingrediente repetido, inativo, de outro estabelecimento e quantidade por unidade), permissões, isolamento entre estabelecimentos e o estado do banco.
 
 ## Ambiente
 
@@ -32,39 +32,39 @@ Todos os resultados abaixo são os observados na execução. Onde a execução f
 - **Regras de negócio:** ingrediente repetido, quantidade decimal para `UNIT`, ingrediente inativo, inexistente ou de outro estabelecimento são rejeitados com 400, e o limite máximo de quantidade coincide com o do banco.
 - **Produto inativo:** pode ter a receita consultada e editada.
 - **Permissões:** OWNER e MANAGER editam, STOCKIST apenas consulta e ATTENDANT não acessa receitas. As permissões são verificadas no backend.
-- **Isolamento:** uma cafeteria não enxerga nem altera receitas de outra, nem usa ingredientes de outra, e as respostas são idênticas às de recursos inexistentes.
+- **Isolamento:** um estabelecimento não enxerga nem altera receitas de outro, nem usa ingredientes de outro, e as respostas são idênticas às de recursos inexistentes.
 - **Ingrediente desativado:** desativar um ingrediente não é bloqueado nem altera as receitas que o usam. A resposta sinaliza `ingredientActive: false`, e a receita só pode ser regravada sem esse ingrediente.
 
 ---
 
 ## Setup
 
-Foram reaproveitadas as contas e os dados dos testes anteriores: cafeteria A (OWNER, MANAGER, STOCKIST e ATTENDANT) e cafeteria B (OWNER), os produtos dos testes de produtos e os ingredientes dos testes de ingredientes e estoque.
+Foram reaproveitadas as contas e os dados dos testes anteriores: estabelecimento A (OWNER, MANAGER, STOCKIST e ATTENDANT) e estabelecimento B (OWNER), os produtos dos testes de produtos e os ingredientes dos testes de ingredientes e estoque.
 
 | # | O que foi feito | Resultado |
 |---|---|---|
 | S1 | `POST /auth/login` das 5 contas e armazenamento dos tokens | 200 nas cinco ✅ |
-| S2 | OWNER A: `GET /ingredients/4` | 404 ✅ (o id 4, "Leite", pertence à cafeteria B, como no teste de estoque) |
-| S3 | OWNER A: `POST /ingredients` com `{"name":"Leite","unit":"ML","minimumQuantity":0}` | 409 "Já existe um ingrediente com este nome." ✅ (a cafeteria A já tinha um Leite) |
+| S2 | OWNER A: `GET /ingredients/4` | 404 ✅ (o id 4, "Leite", pertence ao estabelecimento B, como no teste de estoque) |
+| S3 | OWNER A: `POST /ingredients` com `{"name":"Leite","unit":"ML","minimumQuantity":0}` | 409 "Já existe um ingrediente com este nome." ✅ (o estabelecimento A já tinha um Leite) |
 | S4 | OWNER A: `GET /ingredients?size=100` | 200, 7 ingredientes, com o Leite da A no id 9 (ML, ativo) ✅ |
 
 ### Ids usados
 
 | Variável | Valor | Descrição |
 |---|---|---|
-| `idBrownie` | 1 | Produto, cafeteria A, inativo |
-| `idCappuccino` | 2 | Produto, cafeteria A |
-| `idEspresso` | 3 | Produto, cafeteria A |
-| `idLatte` | 4 | Produto "LATTE GRANDE", cafeteria A |
-| `idCappuccinoB` | 5 | Produto, cafeteria B |
-| `idCaro` | 6 | Produto, cafeteria A, nunca teve receita |
-| `idCafe` | 2 | Ingrediente Café (G), cafeteria A |
-| `idOvo` | 3 | Ingrediente Ovo (UNIT), cafeteria A |
-| `idLeiteB` | 4 | Ingrediente Leite (ML), cafeteria B |
-| `idAcucar` | 5 | Ingrediente Açúcar (G), cafeteria A, inativo |
-| `idChocolate` | 7 | Ingrediente "chocolate EM PÓ" (G), cafeteria A |
-| `idCopo` | 8 | Ingrediente "Copo descartável" (UNIT), cafeteria A |
-| `idLeite` | 9 | Ingrediente Leite (ML), cafeteria A |
+| `idBrownie` | 1 | Produto, estabelecimento A, inativo |
+| `idCappuccino` | 2 | Produto, estabelecimento A |
+| `idEspresso` | 3 | Produto, estabelecimento A |
+| `idLatte` | 4 | Produto "LATTE GRANDE", estabelecimento A |
+| `idCappuccinoB` | 5 | Produto, estabelecimento B |
+| `idCaro` | 6 | Produto, estabelecimento A, nunca teve receita |
+| `idCafe` | 2 | Ingrediente Café (G), estabelecimento A |
+| `idOvo` | 3 | Ingrediente Ovo (UNIT), estabelecimento A |
+| `idLeiteB` | 4 | Ingrediente Leite (ML), estabelecimento B |
+| `idAcucar` | 5 | Ingrediente Açúcar (G), estabelecimento A, inativo |
+| `idChocolate` | 7 | Ingrediente "chocolate EM PÓ" (G), estabelecimento A |
+| `idCopo` | 8 | Ingrediente "Copo descartável" (UNIT), estabelecimento A |
+| `idLeite` | 9 | Ingrediente Leite (ML), estabelecimento A |
 
 ---
 
@@ -156,9 +156,9 @@ O STOCKIST consulta (G2) mas não edita (Q3). O ATTENDANT não acessa receitas e
 
 ---
 
-## Bloco 6: Isolamento entre cafeterias
+## Bloco 6: Isolamento entre estabelecimentos
 
-A cafeteria B tem o produto Cappuccino (5) e o ingrediente Leite (4).
+O estabelecimento B tem o produto Cappuccino (5) e o ingrediente Leite (4).
 
 | # | Token | Requisição | Esperado | Resultado |
 |---|---|---|---|---|
@@ -194,15 +194,15 @@ O R2 mostra que desativar um ingrediente não é bloqueado e não altera as rece
 **V1: estado final das receitas**
 
 ```sql
-SELECT ri.coffee_shop_id, ri.product_id, p.name AS produto,
+SELECT ri.establishment_id, ri.product_id, p.name AS produto,
        ri.ingredient_id, i.name AS ingrediente, ri.quantity
 FROM recipe_items ri
-JOIN products p ON p.id = ri.product_id AND p.coffee_shop_id = ri.coffee_shop_id
-JOIN ingredients i ON i.id = ri.ingredient_id AND i.coffee_shop_id = ri.coffee_shop_id
+JOIN products p ON p.id = ri.product_id AND p.establishment_id = ri.establishment_id
+JOIN ingredients i ON i.id = ri.ingredient_id AND i.establishment_id = ri.establishment_id
 ORDER BY ri.product_id, i.name;
 ```
 
-| coffee_shop_id | product_id | produto | ingredient_id | ingrediente | quantity |
+| establishment_id | product_id | produto | ingredient_id | ingrediente | quantity |
 |---|---|---|---|---|---|
 | 1 | 1 | Brownie | 2 | Café | 10.000 |
 | 1 | 1 | Brownie | 3 | Ovo | 2.000 |
@@ -221,8 +221,8 @@ SELECT ri.id
 FROM recipe_items ri
 JOIN products p ON p.id = ri.product_id
 JOIN ingredients i ON i.id = ri.ingredient_id
-WHERE p.coffee_shop_id <> ri.coffee_shop_id
-   OR i.coffee_shop_id <> ri.coffee_shop_id;
+WHERE p.establishment_id <> ri.establishment_id
+   OR i.establishment_id <> ri.establishment_id;
 ```
 
 Resultado: 0 linhas ✅
