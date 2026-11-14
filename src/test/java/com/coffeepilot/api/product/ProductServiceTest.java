@@ -28,7 +28,7 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
@@ -41,12 +41,12 @@ import com.coffeepilot.api.user.UserRepository;
 @ExtendWith(MockitoExtension.class)
 class ProductServiceTest {
 
-    private static final Long COFFEE_SHOP_ID = 1L;
+    private static final Long ESTABLISHMENT_ID = 1L;
     private static final Long USER_ID = 10L;
 
     private static final AuthenticatedUser AUTH_USER = new AuthenticatedUser(
             USER_ID, "Usuário", "usuario@teste.com",
-            Role.OWNER, COFFEE_SHOP_ID, "Cafeteria");
+            Role.OWNER, ESTABLISHMENT_ID, "Estabelecimento Teste");
 
     @Mock
     private UserRepository userRepository;
@@ -58,7 +58,7 @@ class ProductServiceTest {
     private User user;
 
     @Mock
-    private CoffeeShop coffeeShop;
+    private Establishment establishment;
 
     private ProductService service;
 
@@ -69,12 +69,12 @@ class ProductServiceTest {
                 new ActiveUserProvider(userRepository),
                 productRepository);
 
-        lenient().when(userRepository.findWithCoffeeShopById(USER_ID))
+        lenient().when(userRepository.findWithEstablishmentById(USER_ID))
                 .thenReturn(Optional.of(user));
         lenient().when(user.isActive()).thenReturn(true);
-        lenient().when(user.getCoffeeShop()).thenReturn(coffeeShop);
-        lenient().when(coffeeShop.isActive()).thenReturn(true);
-        lenient().when(coffeeShop.getId()).thenReturn(COFFEE_SHOP_ID);
+        lenient().when(user.getEstablishment()).thenReturn(establishment);
+        lenient().when(establishment.isActive()).thenReturn(true);
+        lenient().when(establishment.getId()).thenReturn(ESTABLISHMENT_ID);
 
         lenient().when(productRepository.saveAndFlush(any(Product.class)))
                 .thenAnswer(invocation -> invocation.getArgument(0));
@@ -90,7 +90,7 @@ class ProductServiceTest {
 
     private Product product(String name, boolean active) {
         Product product = new Product(
-                COFFEE_SHOP_ID, name, "Descrição", new BigDecimal("12.50"));
+                ESTABLISHMENT_ID, name, "Descrição", new BigDecimal("12.50"));
         ReflectionTestUtils.setField(product, "id", 5L);
 
         if (!active) {
@@ -104,7 +104,7 @@ class ProductServiceTest {
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), captor.capture(), eq(pageable));
+                eq(ESTABLISHMENT_ID), any(), captor.capture(), eq(pageable));
 
         return captor.getValue();
     }
@@ -120,13 +120,13 @@ class ProductServiceTest {
 
     @Test
     void criaProdutoComNomeAparadoEPrecoComDuasCasas() {
-        when(productRepository.existsByName(COFFEE_SHOP_ID, "Cappuccino"))
+        when(productRepository.existsByName(ESTABLISHMENT_ID, "Cappuccino"))
                 .thenReturn(false);
 
         Product created = service.create(
                 AUTH_USER, "Cappuccino", "Com chocolate", new BigDecimal("12.5"));
 
-        assertThat(created.getCoffeeShopId()).isEqualTo(COFFEE_SHOP_ID);
+        assertThat(created.getEstablishmentId()).isEqualTo(ESTABLISHMENT_ID);
         assertThat(created.getName()).isEqualTo("Cappuccino");
         assertThat(created.getDescription()).isEqualTo("Com chocolate");
         assertThat(created.getPrice()).isEqualByComparingTo("12.50");
@@ -155,7 +155,7 @@ class ProductServiceTest {
 
     @Test
     void nomeDuplicadoNaCriacaoLancaConflitoESemSalvar() {
-        when(productRepository.existsByName(COFFEE_SHOP_ID, "Cappuccino"))
+        when(productRepository.existsByName(ESTABLISHMENT_ID, "Cappuccino"))
                 .thenReturn(true);
 
         assertThatThrownBy(() -> service.create(
@@ -242,8 +242,8 @@ class ProductServiceTest {
     }
 
     @Test
-    void cafeteriaInativaNaoPodeCriar() {
-        when(coffeeShop.isActive()).thenReturn(false);
+    void estabelecimentoInativoNaoPodeCriar() {
+        when(establishment.isActive()).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(
                 AUTH_USER, "Cappuccino", null, new BigDecimal("12.50")))
@@ -263,7 +263,7 @@ class ProductServiceTest {
         service.list(AUTH_USER, false, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), eq(false), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), eq(false), any(), any(Pageable.class));
     }
 
     @Test
@@ -273,7 +273,7 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), eq((Boolean) null), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), eq((Boolean) null), any(), any(Pageable.class));
     }
 
     @Test
@@ -284,7 +284,7 @@ class ProductServiceTest {
         service.list(AUTH_USER, false, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), eq(true), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), eq(true), any(), any(Pageable.class));
     }
 
     @Test
@@ -295,7 +295,7 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), eq(true), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), eq(true), any(), any(Pageable.class));
     }
 
     @Test
@@ -309,7 +309,7 @@ class ProductServiceTest {
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), searchCaptor.capture(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), pageCaptor.capture());
 
         assertThat(searchCaptor.getValue()).isEqualTo("%");
     }
@@ -322,7 +322,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
 
         assertThat(searchCaptor.getValue()).isEqualTo("%");
     }
@@ -335,7 +335,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
 
         assertThat(searchCaptor.getValue()).isEqualTo("%cappu%");
     }
@@ -348,7 +348,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
 
         assertThat(searchCaptor.getValue()).isEqualTo("%50!%!_off!!%");
     }
@@ -371,7 +371,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
 
         Pageable used = pageCaptor.getValue();
 
@@ -390,7 +390,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
 
         assertThat(pageCaptor.getValue().getSort().stream()
                 .map(order -> order.getProperty()))
@@ -405,7 +405,7 @@ class ProductServiceTest {
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
         verify(productRepository).findByFilters(
-                eq(COFFEE_SHOP_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
 
         assertThat(pageCaptor.getValue().getPageNumber()).isZero();
         assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(20);
@@ -432,7 +432,7 @@ class ProductServiceTest {
     void todosOsPerfisConsultamProdutoAtivo(Role role) {
         loginAs(role);
         Product product = product("Cappuccino", true);
-        when(productRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
 
         assertThat(service.get(AUTH_USER, 5L)).isSameAs(product);
@@ -443,7 +443,7 @@ class ProductServiceTest {
     void perfisSemRestricaoConsultamProdutoInativo(Role role) {
         loginAs(role);
         Product product = product("Cappuccino", false);
-        when(productRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
 
         assertThat(service.get(AUTH_USER, 5L)).isSameAs(product);
@@ -452,7 +452,7 @@ class ProductServiceTest {
     @Test
     void atendenteRecebeNaoEncontradoParaProdutoInativo() {
         loginAs(Role.ATTENDANT);
-        when(productRepository.findByIdAndCoffeeShopId(5L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product("Cappuccino", false)));
 
         assertThatThrownBy(() -> service.get(AUTH_USER, 5L))
@@ -461,8 +461,8 @@ class ProductServiceTest {
     }
 
     @Test
-    void produtoInexistenteOuDeOutraCafeteriaLancaNaoEncontrado() {
-        when(productRepository.findByIdAndCoffeeShopId(99L, COFFEE_SHOP_ID))
+    void produtoInexistenteOuDeOutroEstabelecimentoLancaNaoEncontrado() {
+        when(productRepository.findByIdAndEstablishmentId(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(AUTH_USER, 99L))
@@ -475,7 +475,7 @@ class ProductServiceTest {
     // =====================================================
 
     private void stubLock(Product product) {
-        when(productRepository.findByIdAndCoffeeShopIdForUpdate(5L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
     }
 
@@ -483,7 +483,7 @@ class ProductServiceTest {
     void atualizaNomeDescricaoEPreco() {
         Product product = product("Cappuccino", true);
         stubLock(product);
-        when(productRepository.existsByNameExcludingId(COFFEE_SHOP_ID, 5L, "Cappuccino Grande"))
+        when(productRepository.existsByNameExcludingId(ESTABLISHMENT_ID, 5L, "Cappuccino Grande"))
                 .thenReturn(false);
 
         Product updated = service.update(
@@ -542,7 +542,7 @@ class ProductServiceTest {
     @Test
     void renomearParaNomeExistenteLancaConflito() {
         stubLock(product("Cappuccino", true));
-        when(productRepository.existsByNameExcludingId(COFFEE_SHOP_ID, 5L, "Espresso"))
+        when(productRepository.existsByNameExcludingId(ESTABLISHMENT_ID, 5L, "Espresso"))
                 .thenReturn(true);
 
         assertThatThrownBy(() -> service.update(AUTH_USER, 5L, "Espresso", null, null))
@@ -565,7 +565,7 @@ class ProductServiceTest {
 
     @Test
     void atualizarProdutoInexistenteLancaNaoEncontrado() {
-        when(productRepository.findByIdAndCoffeeShopIdForUpdate(99L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(
@@ -583,7 +583,7 @@ class ProductServiceTest {
                 AUTH_USER, 5L, "Novo", null, null))
                 .isInstanceOf(AccessDeniedException.class);
 
-        verify(productRepository, never()).findByIdAndCoffeeShopIdForUpdate(any(), any());
+        verify(productRepository, never()).findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     // =====================================================
@@ -614,7 +614,7 @@ class ProductServiceTest {
 
     @Test
     void alterarStatusDeProdutoInexistenteLancaNaoEncontrado() {
-        when(productRepository.findByIdAndCoffeeShopIdForUpdate(99L, COFFEE_SHOP_ID))
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.setActive(AUTH_USER, 99L, false))
@@ -629,6 +629,6 @@ class ProductServiceTest {
         assertThatThrownBy(() -> service.setActive(AUTH_USER, 5L, false))
                 .isInstanceOf(AccessDeniedException.class);
 
-        verify(productRepository, never()).findByIdAndCoffeeShopIdForUpdate(any(), any());
+        verify(productRepository, never()).findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 }

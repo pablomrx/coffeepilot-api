@@ -39,7 +39,7 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.coffeeshop.CoffeeShop;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.InsufficientStockException;
@@ -60,13 +60,13 @@ import com.coffeepilot.api.user.UserRepository;
 @ExtendWith(MockitoExtension.class)
 class OrderServiceTest {
 
-    private static final Long COFFEE_SHOP_ID = 1L;
+    private static final Long ESTABLISHMENT_ID = 1L;
     private static final Long USER_ID = 10L;
     private static final Long ORDER_ID = 77L;
 
     private static final AuthenticatedUser AUTH_USER = new AuthenticatedUser(
             USER_ID, "Usuário", "usuario@teste.com",
-            Role.OWNER, COFFEE_SHOP_ID, "Estabelecimento");
+            Role.OWNER, ESTABLISHMENT_ID, "Estabelecimento");
 
     @Mock
     private UserRepository userRepository;
@@ -93,7 +93,7 @@ class OrderServiceTest {
     private User user;
 
     @Mock
-    private CoffeeShop coffeeShop;
+    private Establishment establishment;
 
     @Captor
     private ArgumentCaptor<Collection<Long>> productIdsCaptor;
@@ -118,12 +118,12 @@ class OrderServiceTest {
                 ingredientRepository,
                 stockService);
 
-        lenient().when(userRepository.findWithCoffeeShopById(USER_ID))
+        lenient().when(userRepository.findWithEstablishmentById(USER_ID))
                 .thenReturn(Optional.of(user));
         lenient().when(user.isActive()).thenReturn(true);
-        lenient().when(user.getCoffeeShop()).thenReturn(coffeeShop);
-        lenient().when(coffeeShop.isActive()).thenReturn(true);
-        lenient().when(coffeeShop.getId()).thenReturn(COFFEE_SHOP_ID);
+        lenient().when(user.getEstablishment()).thenReturn(establishment);
+        lenient().when(establishment.isActive()).thenReturn(true);
+        lenient().when(establishment.getId()).thenReturn(ESTABLISHMENT_ID);
 
         loginAs(Role.OWNER);
     }
@@ -136,7 +136,7 @@ class OrderServiceTest {
 
     private Product product(Long id, String name, String price, boolean active) {
         Product product = new Product(
-                COFFEE_SHOP_ID, name, "Descrição", new BigDecimal(price));
+                ESTABLISHMENT_ID, name, "Descrição", new BigDecimal(price));
         ReflectionTestUtils.setField(product, "id", id);
 
         if (!active) {
@@ -157,19 +157,19 @@ class OrderServiceTest {
     }
 
     private void stubProducts(Product... products) {
-        when(productRepository.findAllByIdsForShare(eq(COFFEE_SHOP_ID), any()))
+        when(productRepository.findAllByIdsForShare(eq(ESTABLISHMENT_ID), any()))
                 .thenReturn(List.of(products));
     }
 
     private void stubRecipes(RecipeLineView... lines) {
-        when(recipeItemRepository.findLinesByProducts(eq(COFFEE_SHOP_ID), any()))
+        when(recipeItemRepository.findLinesByProducts(eq(ESTABLISHMENT_ID), any()))
                 .thenReturn(List.of(lines));
     }
 
     private OrderSequence stubSequence(long lastNumber) {
         OrderSequence sequence = new OrderSequence();
         ReflectionTestUtils.setField(sequence, "lastNumber", lastNumber);
-        when(orderSequenceRepository.findForUpdate(COFFEE_SHOP_ID))
+        when(orderSequenceRepository.findForUpdate(ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(sequence));
         return sequence;
     }
@@ -203,7 +203,7 @@ class OrderServiceTest {
     }
 
     private Order orderIn(OrderStatus status) {
-        Order order = new Order(COFFEE_SHOP_ID, 12L, user, null, null);
+        Order order = new Order(ESTABLISHMENT_ID, 12L, user, null, null);
         order.addItem(3L, "Cappuccino", new BigDecimal("12.50"), null, 2, true);
         ReflectionTestUtils.setField(order, "id", ORDER_ID);
 
@@ -222,11 +222,11 @@ class OrderServiceTest {
     }
 
     private void stubLock(Order order) {
-        when(orderRepository.findByIdAndCoffeeShopIdForUpdate(
-                ORDER_ID, COFFEE_SHOP_ID))
+        when(orderRepository.findByIdAndEstablishmentIdForUpdate(
+                ORDER_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(order));
-        lenient().when(orderRepository.findDetailByIdAndCoffeeShopId(
-                        ORDER_ID, COFFEE_SHOP_ID))
+        lenient().when(orderRepository.findDetailByIdAndEstablishmentId(
+                        ORDER_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(order));
     }
 
@@ -248,7 +248,7 @@ class OrderServiceTest {
                 List.of(line(7L, 2), line(3L, 1)));
 
         assertThat(order.getId()).isEqualTo(ORDER_ID);
-        assertThat(order.getCoffeeShopId()).isEqualTo(COFFEE_SHOP_ID);
+        assertThat(order.getEstablishmentId()).isEqualTo(ESTABLISHMENT_ID);
         assertThat(order.getStatus()).isEqualTo(OrderStatus.PENDING);
         assertThat(order.getCreatedBy()).isSameAs(user);
         assertThat(order.getTableReference()).isEqualTo("Mesa 5");
@@ -329,7 +329,7 @@ class OrderServiceTest {
 
         assertThat(order.getOrderNumber()).isEqualTo(12L);
         assertThat(sequence.getLastNumber()).isEqualTo(12L);
-        verify(orderSequenceRepository).createIfMissing(COFFEE_SHOP_ID);
+        verify(orderSequenceRepository).createIfMissing(ESTABLISHMENT_ID);
     }
 
     // =====================================================
@@ -427,13 +427,13 @@ class OrderServiceTest {
                 orderSequenceRepository, orderRepository, stockService);
 
         order.verify(productRepository)
-                .findAllByIdsForShare(eq(COFFEE_SHOP_ID), any());
+                .findAllByIdsForShare(eq(ESTABLISHMENT_ID), any());
         order.verify(recipeItemRepository)
-                .findLinesByProducts(eq(COFFEE_SHOP_ID), any());
+                .findLinesByProducts(eq(ESTABLISHMENT_ID), any());
         order.verify(ingredientRepository)
-                .findAllByIdsForUpdate(eq(COFFEE_SHOP_ID), any());
-        order.verify(orderSequenceRepository).createIfMissing(COFFEE_SHOP_ID);
-        order.verify(orderSequenceRepository).findForUpdate(COFFEE_SHOP_ID);
+                .findAllByIdsForUpdate(eq(ESTABLISHMENT_ID), any());
+        order.verify(orderSequenceRepository).createIfMissing(ESTABLISHMENT_ID);
+        order.verify(orderSequenceRepository).findForUpdate(ESTABLISHMENT_ID);
         order.verify(orderRepository).saveAndFlush(any(Order.class));
         order.verify(stockService)
                 .consumeForOrder(any(), eq(ORDER_ID), any(), any());
@@ -454,11 +454,11 @@ class OrderServiceTest {
                 AUTH_USER, null, null, List.of(line(7L, 1), line(3L, 1)));
 
         verify(productRepository).findAllByIdsForShare(
-                eq(COFFEE_SHOP_ID), productIdsCaptor.capture());
+                eq(ESTABLISHMENT_ID), productIdsCaptor.capture());
         assertThat(productIdsCaptor.getValue()).containsExactly(3L, 7L);
 
         verify(ingredientRepository).findAllByIdsForUpdate(
-                eq(COFFEE_SHOP_ID), ingredientIdsCaptor.capture());
+                eq(ESTABLISHMENT_ID), ingredientIdsCaptor.capture());
         assertThat(ingredientIdsCaptor.getValue()).containsExactly(2L, 5L);
     }
 
@@ -645,7 +645,7 @@ class OrderServiceTest {
 
     @Test
     void estabelecimentoInativoNaoPodeRegistrarPedido() {
-        when(coffeeShop.isActive()).thenReturn(false);
+        when(establishment.isActive()).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(
                 AUTH_USER, null, null, List.of(line(3L, 1))))
@@ -659,15 +659,15 @@ class OrderServiceTest {
     // =====================================================
 
     private Pageable listedPageable(Pageable input) {
-        when(orderRepository.findByCoffeeShopId(
-                eq(COFFEE_SHOP_ID), any(Pageable.class)))
+        when(orderRepository.findByEstablishmentId(
+                eq(ESTABLISHMENT_ID), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         service.list(AUTH_USER, null, input);
 
         ArgumentCaptor<Pageable> captor = ArgumentCaptor.forClass(Pageable.class);
-        verify(orderRepository).findByCoffeeShopId(
-                eq(COFFEE_SHOP_ID), captor.capture());
+        verify(orderRepository).findByEstablishmentId(
+                eq(ESTABLISHMENT_ID), captor.capture());
         return captor.getValue();
     }
 
@@ -676,20 +676,20 @@ class OrderServiceTest {
         listedPageable(PageRequest.of(0, 10));
 
         verify(orderRepository, never())
-                .findByCoffeeShopIdAndStatus(any(), any(), any());
+                .findByEstablishmentIdAndStatus(any(), any(), any());
     }
 
     @Test
     void listagemComStatusFiltraPorStatus() {
-        when(orderRepository.findByCoffeeShopIdAndStatus(
-                eq(COFFEE_SHOP_ID), eq(OrderStatus.PENDING), any(Pageable.class)))
+        when(orderRepository.findByEstablishmentIdAndStatus(
+                eq(ESTABLISHMENT_ID), eq(OrderStatus.PENDING), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of()));
 
         service.list(AUTH_USER, OrderStatus.PENDING, PageRequest.of(0, 10));
 
-        verify(orderRepository).findByCoffeeShopIdAndStatus(
-                eq(COFFEE_SHOP_ID), eq(OrderStatus.PENDING), any(Pageable.class));
-        verify(orderRepository, never()).findByCoffeeShopId(any(), any());
+        verify(orderRepository).findByEstablishmentIdAndStatus(
+                eq(ESTABLISHMENT_ID), eq(OrderStatus.PENDING), any(Pageable.class));
+        verify(orderRepository, never()).findByEstablishmentId(any(), any());
     }
 
     @Test
@@ -724,8 +724,8 @@ class OrderServiceTest {
     @Test
     void listagemRetornaOResultadoDoRepository() {
         Order order = orderIn(OrderStatus.PENDING);
-        when(orderRepository.findByCoffeeShopId(
-                eq(COFFEE_SHOP_ID), any(Pageable.class)))
+        when(orderRepository.findByEstablishmentId(
+                eq(ESTABLISHMENT_ID), any(Pageable.class)))
                 .thenReturn(new PageImpl<>(List.of(order)));
 
         Page<Order> page = service.list(AUTH_USER, null, PageRequest.of(0, 10));
@@ -753,7 +753,7 @@ class OrderServiceTest {
     void perfisAutorizadosConsultamOPedido(Role role) {
         loginAs(role);
         Order order = orderIn(OrderStatus.PENDING);
-        when(orderRepository.findDetailByIdAndCoffeeShopId(ORDER_ID, COFFEE_SHOP_ID))
+        when(orderRepository.findDetailByIdAndEstablishmentId(ORDER_ID, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(order));
 
         assertThat(service.get(AUTH_USER, ORDER_ID)).isSameAs(order);
@@ -761,7 +761,7 @@ class OrderServiceTest {
 
     @Test
     void pedidoInexistenteOuDeOutroEstabelecimentoLancaNaoEncontrado() {
-        when(orderRepository.findDetailByIdAndCoffeeShopId(99L, COFFEE_SHOP_ID))
+        when(orderRepository.findDetailByIdAndEstablishmentId(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.get(AUTH_USER, 99L))
@@ -812,7 +812,7 @@ class OrderServiceTest {
 
     @Test
     void iniciarPreparacaoDePedidoInexistenteLancaNaoEncontrado() {
-        when(orderRepository.findByIdAndCoffeeShopIdForUpdate(99L, COFFEE_SHOP_ID))
+        when(orderRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.startPreparation(AUTH_USER, 99L))
@@ -1028,7 +1028,7 @@ class OrderServiceTest {
         InOrder inOrder = inOrder(orderRepository, stockService);
 
         inOrder.verify(orderRepository)
-                .findByIdAndCoffeeShopIdForUpdate(ORDER_ID, COFFEE_SHOP_ID);
+                .findByIdAndEstablishmentIdForUpdate(ORDER_ID, ESTABLISHMENT_ID);
         inOrder.verify(stockService)
                 .reverseOrderConsumption(user, ORDER_ID, "Cancelamento do pedido nº 12");
         inOrder.verify(orderRepository).saveAndFlush(order);
@@ -1036,7 +1036,7 @@ class OrderServiceTest {
 
     @Test
     void cancelarPedidoInexistenteLancaNaoEncontrado() {
-        when(orderRepository.findByIdAndCoffeeShopIdForUpdate(99L, COFFEE_SHOP_ID))
+        when(orderRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.cancel(AUTH_USER, 99L, null))

@@ -41,7 +41,7 @@ class EmployeeControllerTest {
 
     private RequestPostProcessor owner() {
         var principal = new AuthenticatedUser(
-                1L, "Owner", "owner@x.com", Role.OWNER, 10L, "Cafeteria Teste");
+                1L, "Owner", "owner@x.com", Role.OWNER, 10L, "Estabelecimento Teste");
         var token = new UsernamePasswordAuthenticationToken(
                 principal, null, List.of(new SimpleGrantedAuthority("ROLE_OWNER")));
         return SecurityMockMvcRequestPostProcessors.authentication(token);
