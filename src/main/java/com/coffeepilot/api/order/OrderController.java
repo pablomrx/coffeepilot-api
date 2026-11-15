@@ -1,5 +1,6 @@
 package com.coffeepilot.api.order;
 
+import com.coffeepilot.api.common.dto.PageResponse;
 import com.coffeepilot.api.order.dto.CancelOrderRequest;
 import com.coffeepilot.api.order.dto.CreateOrderRequest;
 import com.coffeepilot.api.order.dto.OrderResponse;
@@ -8,7 +9,6 @@ import com.coffeepilot.api.security.AuthenticatedUser;
 
 import jakarta.validation.Valid;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -56,14 +56,14 @@ public class OrderController {
     }
 
     @GetMapping
-    public Page<OrderSummaryResponse> list(
+    public PageResponse<OrderSummaryResponse> list(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam(required = false) OrderStatus status,
             Pageable pageable) {
 
-        return orderService
-                .list(authenticatedUser, status, pageable)
-                .map(OrderSummaryResponse::from);
+        return PageResponse.from(
+                orderService.list(authenticatedUser, status, pageable),
+                OrderSummaryResponse::from);
     }
 
     @GetMapping("/{orderId}")

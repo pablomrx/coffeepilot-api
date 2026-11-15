@@ -1,5 +1,6 @@
 package com.coffeepilot.api.product;
 
+import com.coffeepilot.api.common.dto.PageResponse;
 import com.coffeepilot.api.product.dto.CreateProductRequest;
 import com.coffeepilot.api.product.dto.ProductResponse;
 import com.coffeepilot.api.product.dto.UpdateProductRequest;
@@ -8,7 +9,6 @@ import com.coffeepilot.api.security.AuthenticatedUser;
 
 import jakarta.validation.Valid;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -48,15 +48,15 @@ public class ProductController {
     }
 
     @GetMapping
-    public Page<ProductResponse> list(
+    public PageResponse<ProductResponse> list(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
-        return productService
-                .list(authenticatedUser, active, search, pageable)
-                .map(ProductResponse::from);
+        return PageResponse.from(
+                productService.list(authenticatedUser, active, search, pageable),
+                ProductResponse::from);
     }
 
     @GetMapping("/{productId}")

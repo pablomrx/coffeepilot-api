@@ -1,5 +1,6 @@
 package com.coffeepilot.api.stock;
 
+import com.coffeepilot.api.common.dto.PageResponse;
 import com.coffeepilot.api.security.AuthenticatedUser;
 import com.coffeepilot.api.stock.dto.CreateStockAdjustmentRequest;
 import com.coffeepilot.api.stock.dto.CreateStockEntryRequest;
@@ -8,7 +9,6 @@ import com.coffeepilot.api.stock.dto.StockMovementResponse;
 
 import jakarta.validation.Valid;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -16,8 +16,8 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.bind.annotation.ResponseStatus;
+import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 public class StockController {
@@ -62,14 +62,14 @@ public class StockController {
     }
 
     @GetMapping("/ingredients/{ingredientId}/stock/movements")
-    public Page<StockMovementResponse> history(
+    public PageResponse<StockMovementResponse> history(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long ingredientId,
             Pageable pageable) {
 
-        return stockService
-                .history(authenticatedUser, ingredientId, pageable)
-                .map(StockMovementResponse::from);
+        return PageResponse.from(
+                stockService.history(authenticatedUser, ingredientId, pageable),
+                StockMovementResponse::from);
     }
 
     @PostMapping("/stock/movements/{movementId}/reversals")

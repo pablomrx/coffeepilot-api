@@ -18,6 +18,7 @@ public record StockMovementResponse(
         Long createdById,
         String createdByName,
         Long reversesMovementId,
+        Long orderId,
         OffsetDateTime createdAt
 ) {
 
@@ -35,6 +36,7 @@ public record StockMovementResponse(
                 movement.getReversesMovement() == null
                         ? null
                         : movement.getReversesMovement().getId(),
+                movement.getOrderId(),
                 movement.getCreatedAt()
         );
     }

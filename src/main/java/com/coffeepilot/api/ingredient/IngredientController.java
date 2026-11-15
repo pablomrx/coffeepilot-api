@@ -1,5 +1,6 @@
 package com.coffeepilot.api.ingredient;
 
+import com.coffeepilot.api.common.dto.PageResponse;
 import com.coffeepilot.api.ingredient.dto.CreateIngredientRequest;
 import com.coffeepilot.api.ingredient.dto.IngredientResponse;
 import com.coffeepilot.api.ingredient.dto.UpdateIngredientRequest;
@@ -8,7 +9,6 @@ import com.coffeepilot.api.security.AuthenticatedUser;
 
 import jakarta.validation.Valid;
 
-import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -49,15 +49,16 @@ public class IngredientController {
     }
 
     @GetMapping
-    public Page<IngredientResponse> list(
+    public PageResponse<IngredientResponse> list(
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @RequestParam(required = false) Boolean active,
             @RequestParam(required = false) Boolean lowStock,
             Pageable pageable) {
 
-        return ingredientService
-                .list(authenticatedUser, active, lowStock, pageable)
-                .map(IngredientResponse::from);
+        return PageResponse.from(
+                ingredientService.list(
+                        authenticatedUser, active, lowStock, pageable),
+                IngredientResponse::from);
     }
 
     @GetMapping("/{ingredientId}")
