@@ -1,3 +1,4 @@
+
 package com.coffeepilot.api.order;
 
 import jakarta.persistence.LockModeType;
@@ -14,11 +15,13 @@ import java.util.Optional;
 
 public interface OrderRepository extends JpaRepository<Order, Long> {
 
-    // Pedido com itens, criador e responsável pelo cancelamento,
-    // para consulta de detalhes.
+    // Pedido com itens e responsáveis (criação, início, conclusão e
+    // cancelamento), para consulta de detalhes.
     @Query("""
             SELECT DISTINCT o FROM Order o
             JOIN FETCH o.createdBy
+            LEFT JOIN FETCH o.startedBy
+            LEFT JOIN FETCH o.completedBy
             LEFT JOIN FETCH o.cancelledBy
             LEFT JOIN FETCH o.items
             WHERE o.id = :id
@@ -30,7 +33,7 @@ public interface OrderRepository extends JpaRepository<Order, Long> {
     );
 
     // Busca e bloqueia o pedido para mudança de status e cancelamento.
-    // Sem JOIN FETCH: o PostgreSQL não permite FOR UPDATE com junção externa.
+    // Sem JOIN FETCH: evita problemas com FOR UPDATE e junções externas.
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("""
             SELECT o FROM Order o

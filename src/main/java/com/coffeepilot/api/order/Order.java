@@ -66,8 +66,19 @@ public class Order {
     @JoinColumn(name = "created_by", nullable = false, updatable = false)
     private User createdBy;
 
+    @Column(name = "started_at")
+    private OffsetDateTime startedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "started_by")
+    private User startedBy;
+
     @Column(name = "completed_at")
     private OffsetDateTime completedAt;
+
+    @ManyToOne(fetch = FetchType.LAZY)
+    @JoinColumn(name = "completed_by")
+    private User completedBy;
 
     @Column(name = "cancelled_at")
     private OffsetDateTime cancelledAt;
@@ -181,23 +192,30 @@ public class Order {
         return item;
     }
 
-    public void startPreparation() {
+    public void startPreparation(User startedBy) {
+        Objects.requireNonNull(startedBy, "startedBy is required");
+
         requireStatus(
                 OrderStatus.PENDING,
                 "Apenas pedidos pendentes podem entrar em preparação."
         );
 
-        status = OrderStatus.IN_PREPARATION;
+        this.status = OrderStatus.IN_PREPARATION;
+        this.startedAt = OffsetDateTime.now();
+        this.startedBy = startedBy;
     }
 
-    public void complete() {
+    public void complete(User completedBy) {
+        Objects.requireNonNull(completedBy, "completedBy is required");
+
         requireStatus(
                 OrderStatus.IN_PREPARATION,
                 "Apenas pedidos em preparação podem ser concluídos."
         );
 
-        status = OrderStatus.COMPLETED;
-        completedAt = OffsetDateTime.now();
+        this.status = OrderStatus.COMPLETED;
+        this.completedAt = OffsetDateTime.now();
+        this.completedBy = completedBy;
     }
 
     public void cancel(User cancelledBy, String reason) {
@@ -290,8 +308,20 @@ public class Order {
         return createdBy;
     }
 
+    public OffsetDateTime getStartedAt() {
+        return startedAt;
+    }
+
+    public User getStartedBy() {
+        return startedBy;
+    }
+
     public OffsetDateTime getCompletedAt() {
         return completedAt;
+    }
+
+    public User getCompletedBy() {
+        return completedBy;
     }
 
     public OffsetDateTime getCancelledAt() {

@@ -16,7 +16,10 @@ public record OrderResponse(
         BigDecimal total,
         List<OrderItemResponse> items,
         String createdByName,
+        OffsetDateTime startedAt,
+        String startedByName,
         OffsetDateTime completedAt,
+        String completedByName,
         OffsetDateTime cancelledAt,
         String cancelledByName,
         OrderStatus cancelledFromStatus,
@@ -37,7 +40,14 @@ public record OrderResponse(
                         .map(OrderItemResponse::from)
                         .toList(),
                 order.getCreatedBy().getName(),
+                order.getStartedAt(),
+                order.getStartedBy() == null
+                        ? null
+                        : order.getStartedBy().getName(),
                 order.getCompletedAt(),
+                order.getCompletedBy() == null
+                        ? null
+                        : order.getCompletedBy().getName(),
                 order.getCancelledAt(),
                 order.getCancelledBy() == null
                         ? null

@@ -1,3 +1,4 @@
+
 package com.coffeepilot.api.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
@@ -210,10 +211,10 @@ class OrderServiceTest {
         switch (status) {
             case PENDING -> {
             }
-            case IN_PREPARATION -> order.startPreparation();
+            case IN_PREPARATION -> order.startPreparation(user);
             case COMPLETED -> {
-                order.startPreparation();
-                order.complete();
+                order.startPreparation(user);
+                order.complete(user);
             }
             case CANCELLED -> order.cancel(user, "Cliente desistiu");
         }
@@ -793,6 +794,10 @@ class OrderServiceTest {
         Order result = service.startPreparation(AUTH_USER, ORDER_ID);
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.IN_PREPARATION);
+        assertThat(result.getStartedBy()).isSameAs(user);
+        assertThat(result.getStartedAt()).isNotNull();
+        assertThat(result.getCompletedBy()).isNull();
+
         verify(orderRepository).saveAndFlush(order);
         verifyNoStockEffect();
     }
@@ -845,6 +850,10 @@ class OrderServiceTest {
 
         assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(result.getCompletedAt()).isNotNull();
+        assertThat(result.getCompletedBy()).isSameAs(user);
+        assertThat(result.getStartedBy()).isSameAs(user);
+        assertThat(result.getStartedAt()).isNotNull();
+
         verify(orderRepository).saveAndFlush(order);
     }
 
@@ -899,6 +908,10 @@ class OrderServiceTest {
         assertThat(result.getCancelledAt()).isNotNull();
         assertThat(result.getCancellationReason()).isNull();
 
+        // Um pedido cancelado enquanto pendente nunca iniciou a preparação.
+        assertThat(result.getStartedAt()).isNull();
+        assertThat(result.getStartedBy()).isNull();
+
         verify(stockService).reverseOrderConsumption(
                 user, ORDER_ID, "Cancelamento do pedido nº 12");
         verify(orderRepository).saveAndFlush(order);
@@ -927,6 +940,10 @@ class OrderServiceTest {
         assertThat(result.getCancelledFromStatus())
                 .isEqualTo(OrderStatus.IN_PREPARATION);
         assertThat(result.getCancellationReason()).isEqualTo("Cliente foi embora");
+
+        // O cancelamento não apaga a auditoria do início da preparação.
+        assertThat(result.getStartedAt()).isNotNull();
+        assertThat(result.getStartedBy()).isSameAs(user);
 
         verify(stockService, never()).reverseOrderConsumption(any(), any(), any());
         verify(orderRepository).saveAndFlush(order);

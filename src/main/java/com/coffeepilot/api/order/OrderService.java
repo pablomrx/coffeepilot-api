@@ -237,7 +237,7 @@ public class OrderService {
         Order order = lockOrder(actor, orderId);
 
         try {
-            order.startPreparation();
+            order.startPreparation(actor);
         } catch (IllegalStateException ex) {
             throw new BusinessConflictException(ex.getMessage());
         }
@@ -260,7 +260,7 @@ public class OrderService {
         Order order = lockOrder(actor, orderId);
 
         try {
-            order.complete();
+            order.complete(actor);
         } catch (IllegalStateException ex) {
             throw new BusinessConflictException(ex.getMessage());
         }
