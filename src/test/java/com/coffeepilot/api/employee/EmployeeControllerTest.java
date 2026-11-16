@@ -34,16 +34,32 @@ import com.coffeepilot.api.user.Role;
 @AutoConfigureMockMvc
 class EmployeeControllerTest {
 
-    @Autowired MockMvc mockMvc;
-    @MockitoBean EmployeeService employeeService;
+    private static final String EMPLOYEES_URL = "/v1/employees";
+
+    @Autowired
+    MockMvc mockMvc;
+
+    @MockitoBean
+    EmployeeService employeeService;
 
     // ---------- helpers ----------
 
     private RequestPostProcessor owner() {
         var principal = new AuthenticatedUser(
-                1L, "Owner", "owner@x.com", Role.OWNER, 10L, "Estabelecimento Teste");
+                1L,
+                "Owner",
+                "owner@x.com",
+                Role.OWNER,
+                10L,
+                "Estabelecimento Teste"
+        );
+
         var token = new UsernamePasswordAuthenticationToken(
-                principal, null, List.of(new SimpleGrantedAuthority("ROLE_OWNER")));
+                principal,
+                null,
+                List.of(new SimpleGrantedAuthority("ROLE_OWNER"))
+        );
+
         return SecurityMockMvcRequestPostProcessors.authentication(token);
     }
 
@@ -61,11 +77,12 @@ class EmployeeControllerTest {
 
     @Test
     void semAutenticacaoRetorna401() throws Exception {
-        mockMvc.perform(post("/employees")
+        mockMvc.perform(post(EMPLOYEES_URL)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.message").value("Autenticação necessária."));
+                .andExpect(jsonPath("$.message")
+                        .value("Autenticação necessária."));
 
         verify(employeeService, never()).create(any(), any());
     }
@@ -75,10 +92,17 @@ class EmployeeControllerTest {
     @Test
     void requisicaoValidaRetorna201SemSenha() throws Exception {
         when(employeeService.create(any(), any())).thenReturn(new EmployeeResponse(
-                5L, "Ana", "ana@x.com", Role.ATTENDANT, true,
-                OffsetDateTime.parse("2026-10-28T10:15:30-03:00"), null));
+                5L,
+                "Ana",
+                "ana@x.com",
+                Role.ATTENDANT,
+                true,
+                OffsetDateTime.parse("2026-10-28T10:15:30-03:00"),
+                null
+        ));
 
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isCreated())
@@ -93,7 +117,8 @@ class EmployeeControllerTest {
 
     @Test
     void nomeEmBrancoRetorna400() throws Exception {
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("   ", "ana@x.com", "senha1234", "ATTENDANT")))
                 .andExpect(status().isBadRequest())
@@ -104,7 +129,8 @@ class EmployeeControllerTest {
 
     @Test
     void emailInvalidoRetorna400() throws Exception {
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("Ana", "a@b", "senha1234", "ATTENDANT")))
                 .andExpect(status().isBadRequest())
@@ -113,7 +139,8 @@ class EmployeeControllerTest {
 
     @Test
     void senhaCurtaRetorna400() throws Exception {
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("Ana", "ana@x.com", "1234567", "ATTENDANT")))
                 .andExpect(status().isBadRequest())
@@ -122,10 +149,11 @@ class EmployeeControllerTest {
 
     @Test
     void senhaComMaisDe72BytesRetornaErroNoCampoPassword() throws Exception {
-        // 40 caracteres, 80 bytes em UTF-8: passa no @Size, falha no @AssertTrue
+        // 40 caracteres, 80 bytes em UTF-8: passa no @Size, falha no @AssertTrue.
         String senha = "ç".repeat(40);
 
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("Ana", "ana@x.com", senha, "ATTENDANT")))
                 .andExpect(status().isBadRequest())
@@ -134,7 +162,8 @@ class EmployeeControllerTest {
 
     @Test
     void cargoInexistenteRetorna400() throws Exception {
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body("Ana", "ana@x.com", "senha1234", "CHEFE")))
                 .andExpect(status().isBadRequest());
@@ -149,7 +178,8 @@ class EmployeeControllerTest {
         when(employeeService.create(any(), any()))
                 .thenThrow(new AccessDeniedException("sem permissão"));
 
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isForbidden());
@@ -160,7 +190,8 @@ class EmployeeControllerTest {
         when(employeeService.create(any(), any()))
                 .thenThrow(new EmailAlreadyUsedException());
 
-        mockMvc.perform(post("/employees").with(owner())
+        mockMvc.perform(post(EMPLOYEES_URL)
+                        .with(owner())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(validBody()))
                 .andExpect(status().isConflict())

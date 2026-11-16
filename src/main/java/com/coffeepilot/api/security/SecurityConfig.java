@@ -13,6 +13,7 @@ import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.authentication.UsernamePasswordAuthenticationFilter;
+import org.springframework.security.web.context.SecurityContextHolderFilter;
 
 import tools.jackson.databind.ObjectMapper;
 
@@ -24,8 +25,6 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    // A autenticação é feita pelo JWT. Este bean existe só para o Spring Boot
-    // não criar o usuário padrão com senha gerada.
     @Bean
     public UserDetailsService userDetailsService() {
         return username -> {
@@ -43,15 +42,15 @@ public class SecurityConfig {
         return new JwtAuthenticationFilter(jwtService, userRepository);
     }
 
-    // Impede o registro automático do filtro no contêiner de servlets:
-    // ele deve rodar apenas dentro da cadeia do Spring Security.
     @Bean
     public FilterRegistrationBean<JwtAuthenticationFilter> jwtFilterRegistration(
             JwtAuthenticationFilter filter
     ) {
         FilterRegistrationBean<JwtAuthenticationFilter> registration =
                 new FilterRegistrationBean<>(filter);
+
         registration.setEnabled(false);
+
         return registration;
     }
 
@@ -59,24 +58,40 @@ public class SecurityConfig {
     public SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             JwtAuthenticationFilter jwtAuthenticationFilter,
+            RateLimitFilter rateLimitFilter,
             ObjectMapper objectMapper
     ) throws Exception {
+
         JsonSecurityErrorHandler errorHandler =
                 new JsonSecurityErrorHandler(objectMapper);
 
         http
                 .csrf(csrf -> csrf.disable())
+
                 .sessionManagement(session ->
                         session.sessionCreationPolicy(SessionCreationPolicy.STATELESS))
+
                 .formLogin(form -> form.disable())
+
                 .httpBasic(basic -> basic.disable())
+
                 .exceptionHandling(exceptions -> exceptions
                         .authenticationEntryPoint(errorHandler)
                         .accessDeniedHandler(errorHandler))
+
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers("/error").permitAll()
-                        .requestMatchers("/auth/register", "/auth/login").permitAll()
+                        .requestMatchers(
+                                "/v1/auth/register",
+                                "/v1/auth/login"
+                        ).permitAll()
                         .anyRequest().authenticated())
+
+                .addFilterAfter(
+                        rateLimitFilter,
+                        SecurityContextHolderFilter.class
+                )
+
                 .addFilterBefore(
                         jwtAuthenticationFilter,
                         UsernamePasswordAuthenticationFilter.class
