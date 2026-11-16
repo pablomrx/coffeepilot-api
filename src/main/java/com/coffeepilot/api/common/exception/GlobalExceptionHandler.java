@@ -38,6 +38,30 @@ public class GlobalExceptionHandler {
             "uq_stock_movements_initial_per_ingredient";
     private static final String UNIQUE_VIOLATION_SQL_STATE = "23505";
 
+    @ExceptionHandler(TooManyLoginAttemptsException.class)
+    public ResponseEntity<ApiError> handleTooManyLoginAttempts(
+            TooManyLoginAttemptsException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.TOO_MANY_REQUESTS;
+
+        ApiError body = new ApiError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of()
+        );
+
+        return ResponseEntity.status(status)
+                .header(
+                        "Retry-After",
+                        String.valueOf(Math.max(1, ex.getRetryAfterSeconds()))
+                )
+                .body(body);
+    }
+
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ResponseEntity<ApiError> handleEmailAlreadyUsed(
             EmailAlreadyUsedException ex,

@@ -1,6 +1,7 @@
 package com.coffeepilot.api.common.exception;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.groups.Tuple.tuple;
 
 import java.lang.reflect.Method;
 import java.sql.SQLException;
@@ -154,6 +155,30 @@ class GlobalExceptionHandlerTest {
                 .isEqualTo("A variação do ajuste não pode ser zero.");
     }
 
+    // ---------- limite de tentativas de login ----------
+
+    @Test
+    void excessoDeTentativasDeLoginVira429ComRetryAfter() {
+        var response = handler.handleTooManyLoginAttempts(
+                new TooManyLoginAttemptsException(900), request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(429);
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("900");
+        assertThat(response.getBody().status()).isEqualTo(429);
+        assertThat(response.getBody().message())
+                .isEqualTo("Muitas tentativas de login. Tente novamente em instantes.");
+        assertThat(response.getBody().path()).isEqualTo("/employees");
+        assertThat(response.getBody().fieldErrors()).isEmpty();
+    }
+
+    @Test
+    void retryAfterNuncaEMenorQueUm() {
+        var response = handler.handleTooManyLoginAttempts(
+                new TooManyLoginAttemptsException(0), request);
+
+        assertThat(response.getHeaders().getFirst("Retry-After")).isEqualTo("1");
+    }
+
     // ---------- validação e mapeamento de campos ----------
 
     @Test
@@ -166,9 +191,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().fieldErrors())
                 .extracting(ApiError.FieldViolation::field,
                         ApiError.FieldViolation::message)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(
-                                "quantity", "A quantidade é obrigatória."));
+                .containsExactly(tuple("quantity", "A quantidade é obrigatória."));
     }
 
     @Test
@@ -192,9 +215,7 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getBody().fieldErrors())
                 .extracting(ApiError.FieldViolation::field,
                         ApiError.FieldViolation::message)
-                .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple(
-                                "quantityDelta", "A variação não pode ser zero."));
+                .containsExactly(tuple("quantityDelta", "A variação não pode ser zero."));
     }
 
     @Test
