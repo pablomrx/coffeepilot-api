@@ -12,6 +12,7 @@ import static org.mockito.Mockito.when;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Optional;
+import java.util.Set;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -28,10 +29,11 @@ import org.springframework.data.domain.Pageable;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
+import com.coffeepilot.api.establishment.Establishment;
+import com.coffeepilot.api.recipe.RecipeItemRepository;
 import com.coffeepilot.api.security.ActiveUserProvider;
 import com.coffeepilot.api.security.AuthenticatedUser;
 import com.coffeepilot.api.user.Role;
@@ -45,14 +47,22 @@ class ProductServiceTest {
     private static final Long USER_ID = 10L;
 
     private static final AuthenticatedUser AUTH_USER = new AuthenticatedUser(
-            USER_ID, "Usuário", "usuario@teste.com",
-            Role.OWNER, ESTABLISHMENT_ID, "Estabelecimento Teste");
+            USER_ID,
+            "Usuário",
+            "usuario@teste.com",
+            Role.OWNER,
+            ESTABLISHMENT_ID,
+            "Estabelecimento Teste"
+    );
 
     @Mock
     private UserRepository userRepository;
 
     @Mock
     private ProductRepository productRepository;
+
+    @Mock
+    private RecipeItemRepository recipeItemRepository;
 
     @Mock
     private User user;
@@ -67,7 +77,9 @@ class ProductServiceTest {
         // ActiveUserProvider real: assim as permissões por perfil são testadas de verdade.
         service = new ProductService(
                 new ActiveUserProvider(userRepository),
-                productRepository);
+                productRepository,
+                recipeItemRepository
+        );
 
         lenient().when(userRepository.findWithEstablishmentById(USER_ID))
                 .thenReturn(Optional.of(user));
@@ -82,15 +94,18 @@ class ProductServiceTest {
         loginAs(Role.OWNER);
     }
 
-    // ---------- helpers ----------
-
     private void loginAs(Role role) {
         lenient().when(user.getRole()).thenReturn(role);
     }
 
     private Product product(String name, boolean active) {
         Product product = new Product(
-                ESTABLISHMENT_ID, name, "Descrição", new BigDecimal("12.50"));
+                ESTABLISHMENT_ID,
+                name,
+                "Descrição",
+                new BigDecimal("12.50")
+        );
+
         ReflectionTestUtils.setField(product, "id", 5L);
 
         if (!active) {
@@ -98,15 +113,6 @@ class ProductServiceTest {
         }
 
         return product;
-    }
-
-    private String capturedSearchPattern(Pageable pageable) {
-        ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
-
-        verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), captor.capture(), eq(pageable));
-
-        return captor.getValue();
     }
 
     private void stubFindByFilters() {
@@ -124,7 +130,11 @@ class ProductServiceTest {
                 .thenReturn(false);
 
         Product created = service.create(
-                AUTH_USER, "Cappuccino", "Com chocolate", new BigDecimal("12.5"));
+                AUTH_USER,
+                "Cappuccino",
+                "Com chocolate",
+                new BigDecimal("12.5")
+        );
 
         assertThat(created.getEstablishmentId()).isEqualTo(ESTABLISHMENT_ID);
         assertThat(created.getName()).isEqualTo("Cappuccino");
@@ -132,6 +142,7 @@ class ProductServiceTest {
         assertThat(created.getPrice()).isEqualByComparingTo("12.50");
         assertThat(created.getPrice().scale()).isEqualTo(2);
         assertThat(created.isActive()).isTrue();
+
         verify(productRepository).saveAndFlush(any(Product.class));
     }
 
@@ -140,7 +151,11 @@ class ProductServiceTest {
         loginAs(Role.MANAGER);
 
         Product created = service.create(
-                AUTH_USER, "Espresso", null, new BigDecimal("8.00"));
+                AUTH_USER,
+                "Espresso",
+                null,
+                new BigDecimal("8.00")
+        );
 
         assertThat(created.getName()).isEqualTo("Espresso");
     }
@@ -148,7 +163,11 @@ class ProductServiceTest {
     @Test
     void descricaoEmBrancoNaCriacaoViraNula() {
         Product created = service.create(
-                AUTH_USER, "Espresso", "   ", new BigDecimal("8.00"));
+                AUTH_USER,
+                "Espresso",
+                "   ",
+                new BigDecimal("8.00")
+        );
 
         assertThat(created.getDescription()).isNull();
     }
@@ -159,7 +178,11 @@ class ProductServiceTest {
                 .thenReturn(true);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("12.50")))
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("12.50")
+        ))
                 .isInstanceOf(BusinessConflictException.class)
                 .hasMessage("Já existe um produto com este nome.");
 
@@ -169,7 +192,11 @@ class ProductServiceTest {
     @Test
     void nomeEmBrancoNaCriacaoLancaRegraDeNegocio() {
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "   ", null, new BigDecimal("12.50")))
+                AUTH_USER,
+                "   ",
+                null,
+                new BigDecimal("12.50")
+        ))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("O nome é obrigatório.");
 
@@ -179,7 +206,11 @@ class ProductServiceTest {
     @Test
     void precoNuloNaCriacaoLancaRegraDeNegocio() {
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, null))
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                null
+        ))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("O preço é obrigatório.");
     }
@@ -187,12 +218,18 @@ class ProductServiceTest {
     @Test
     void precoZeroOuNegativoNaCriacaoLancaRegraDeNegocio() {
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, BigDecimal.ZERO))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                BigDecimal.ZERO
+        )).isInstanceOf(BusinessRuleException.class);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("-1.00")))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("-1.00")
+        )).isInstanceOf(BusinessRuleException.class);
 
         verify(productRepository, never()).saveAndFlush(any());
     }
@@ -200,15 +237,21 @@ class ProductServiceTest {
     @Test
     void precoComTresCasasDecimaisNaCriacaoLancaRegraDeNegocio() {
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("12.505")))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("12.505")
+        )).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
     void precoAcimaDoMaximoNaCriacaoLancaRegraDeNegocio() {
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("100000000.00")))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("100000000.00")
+        )).isInstanceOf(BusinessRuleException.class);
     }
 
     @Test
@@ -216,8 +259,11 @@ class ProductServiceTest {
         String longName = "a".repeat(151);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, longName, null, new BigDecimal("12.50")))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                longName,
+                null,
+                new BigDecimal("12.50")
+        )).isInstanceOf(BusinessRuleException.class);
     }
 
     @ParameterizedTest
@@ -226,8 +272,11 @@ class ProductServiceTest {
         loginAs(role);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("12.50")))
-                .isInstanceOf(AccessDeniedException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("12.50")
+        )).isInstanceOf(AccessDeniedException.class);
 
         verify(productRepository, never()).saveAndFlush(any());
     }
@@ -237,8 +286,11 @@ class ProductServiceTest {
         when(user.isActive()).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("12.50")))
-                .isInstanceOf(AccessDeniedException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("12.50")
+        )).isInstanceOf(AccessDeniedException.class);
     }
 
     @Test
@@ -246,8 +298,11 @@ class ProductServiceTest {
         when(establishment.isActive()).thenReturn(false);
 
         assertThatThrownBy(() -> service.create(
-                AUTH_USER, "Cappuccino", null, new BigDecimal("12.50")))
-                .isInstanceOf(AccessDeniedException.class);
+                AUTH_USER,
+                "Cappuccino",
+                null,
+                new BigDecimal("12.50")
+        )).isInstanceOf(AccessDeniedException.class);
     }
 
     // =====================================================
@@ -263,7 +318,11 @@ class ProductServiceTest {
         service.list(AUTH_USER, false, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), eq(false), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                eq(false),
+                any(),
+                any(Pageable.class)
+        );
     }
 
     @Test
@@ -273,7 +332,11 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), eq((Boolean) null), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                eq((Boolean) null),
+                any(),
+                any(Pageable.class)
+        );
     }
 
     @Test
@@ -284,7 +347,11 @@ class ProductServiceTest {
         service.list(AUTH_USER, false, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), eq(true), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                eq(true),
+                any(),
+                any(Pageable.class)
+        );
     }
 
     @Test
@@ -295,21 +362,27 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, PageRequest.of(0, 10));
 
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), eq(true), any(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                eq(true),
+                any(),
+                any(Pageable.class)
+        );
     }
 
     @Test
     void listagemSemBuscaUsaPadraoCoringa() {
         stubFindByFilters();
-        Pageable pageable = PageRequest.of(0, 10);
 
-        service.list(AUTH_USER, null, null, pageable);
+        service.list(AUTH_USER, null, null, PageRequest.of(0, 10));
 
-        ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
 
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID),
+                any(),
+                searchCaptor.capture(),
+                any(Pageable.class)
+        );
 
         assertThat(searchCaptor.getValue()).isEqualTo("%");
     }
@@ -321,8 +394,13 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, "   ", PageRequest.of(0, 10));
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                any(),
+                searchCaptor.capture(),
+                any(Pageable.class)
+        );
 
         assertThat(searchCaptor.getValue()).isEqualTo("%");
     }
@@ -334,8 +412,13 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, "  CaPPu  ", PageRequest.of(0, 10));
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                any(),
+                searchCaptor.capture(),
+                any(Pageable.class)
+        );
 
         assertThat(searchCaptor.getValue()).isEqualTo("%cappu%");
     }
@@ -347,8 +430,13 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, "50%_off!", PageRequest.of(0, 10));
 
         ArgumentCaptor<String> searchCaptor = ArgumentCaptor.forClass(String.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), searchCaptor.capture(), any(Pageable.class));
+                eq(ESTABLISHMENT_ID),
+                any(),
+                searchCaptor.capture(),
+                any(Pageable.class)
+        );
 
         assertThat(searchCaptor.getValue()).isEqualTo("%50!%!_off!!%");
     }
@@ -358,7 +446,11 @@ class ProductServiceTest {
         String longSearch = "a".repeat(151);
 
         assertThatThrownBy(() -> service.list(
-                AUTH_USER, null, longSearch, PageRequest.of(0, 10)))
+                AUTH_USER,
+                null,
+                longSearch,
+                PageRequest.of(0, 10)
+        ))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("A busca deve ter no máximo 150 caracteres.");
     }
@@ -370,8 +462,13 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, PageRequest.of(2, 500));
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID),
+                any(),
+                any(),
+                pageCaptor.capture()
+        );
 
         Pageable used = pageCaptor.getValue();
 
@@ -385,12 +482,21 @@ class ProductServiceTest {
     void ordenacaoEnviadaPeloClienteEhIgnorada() {
         stubFindByFilters();
 
-        service.list(AUTH_USER, null, null,
-                PageRequest.of(0, 10, org.springframework.data.domain.Sort.by("price")));
+        service.list(
+                AUTH_USER,
+                null,
+                null,
+                PageRequest.of(0, 10, org.springframework.data.domain.Sort.by("price"))
+        );
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID),
+                any(),
+                any(),
+                pageCaptor.capture()
+        );
 
         assertThat(pageCaptor.getValue().getSort().stream()
                 .map(order -> order.getProperty()))
@@ -404,8 +510,13 @@ class ProductServiceTest {
         service.list(AUTH_USER, null, null, Pageable.unpaged());
 
         ArgumentCaptor<Pageable> pageCaptor = ArgumentCaptor.forClass(Pageable.class);
+
         verify(productRepository).findByFilters(
-                eq(ESTABLISHMENT_ID), any(), any(), pageCaptor.capture());
+                eq(ESTABLISHMENT_ID),
+                any(),
+                any(),
+                pageCaptor.capture()
+        );
 
         assertThat(pageCaptor.getValue().getPageNumber()).isZero();
         assertThat(pageCaptor.getValue().getPageSize()).isEqualTo(20);
@@ -414,13 +525,175 @@ class ProductServiceTest {
     @Test
     void listagemRetornaOResultadoDoRepository() {
         Product product = product("Cappuccino", true);
+
         when(productRepository.findByFilters(any(), any(), any(), any()))
                 .thenReturn(new PageImpl<>(List.of(product)));
 
         Page<Product> page = service.list(
-                AUTH_USER, null, null, PageRequest.of(0, 10));
+                AUTH_USER,
+                null,
+                null,
+                PageRequest.of(0, 10)
+        );
 
         assertThat(page.getContent()).containsExactly(product);
+    }
+
+    // =====================================================
+    // findProductIdsWithRecipe
+    // =====================================================
+
+    @Test
+    void consultaDeProdutosComReceitaRetornaIdsEncontrados() {
+        Product product = product("Cappuccino", true);
+
+        when(recipeItemRepository.findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        )).thenReturn(List.of(5L));
+
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product)
+        );
+
+        assertThat(result).containsExactly(5L);
+
+        verify(recipeItemRepository).findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        );
+    }
+
+    @Test
+    void consultaDeProdutosSemReceitaRetornaConjuntoVazio() {
+        Product product = product("Cappuccino", true);
+
+        when(recipeItemRepository.findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        )).thenReturn(List.of());
+
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product)
+        );
+
+        assertThat(result).isEmpty();
+    }
+
+    @Test
+    void consultaComListaVaziaRetornaConjuntoVazioSemConsultarRepository() {
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of()
+        );
+
+        assertThat(result).isEmpty();
+
+        verify(recipeItemRepository, never())
+                .findProductIdsWithRecipe(any(), any());
+    }
+
+    @Test
+    void consultaComListaNulaRetornaConjuntoVazioSemConsultarRepository() {
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                null
+        );
+
+        assertThat(result).isEmpty();
+
+        verify(recipeItemRepository, never())
+                .findProductIdsWithRecipe(any(), any());
+    }
+
+    @Test
+    void consultaDeReceitasUtilizaEstabelecimentoDoUsuarioAutenticado() {
+        Product product = new Product(
+                99L,
+                "Cappuccino",
+                "Descrição",
+                new BigDecimal("12.50")
+        );
+
+        ReflectionTestUtils.setField(product, "id", 5L);
+
+        when(recipeItemRepository.findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        )).thenReturn(List.of(5L));
+
+        service.findProductIdsWithRecipe(AUTH_USER, List.of(product));
+
+        verify(recipeItemRepository).findProductIdsWithRecipe(
+                eq(ESTABLISHMENT_ID),
+                eq(List.of(5L))
+        );
+    }
+
+    @Test
+    void usuarioInativoNaoPodeConsultarProdutosComReceita() {
+        when(user.isActive()).thenReturn(false);
+
+        assertThatThrownBy(() -> service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product("Cappuccino", true))
+        )).isInstanceOf(AccessDeniedException.class);
+
+        verify(recipeItemRepository, never())
+                .findProductIdsWithRecipe(any(), any());
+    }
+
+    @Test
+    void estabelecimentoInativoNaoPodeConsultarProdutosComReceita() {
+        when(establishment.isActive()).thenReturn(false);
+
+        assertThatThrownBy(() -> service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product("Cappuccino", true))
+        )).isInstanceOf(AccessDeniedException.class);
+
+        verify(recipeItemRepository, never())
+                .findProductIdsWithRecipe(any(), any());
+    }
+
+    @Test
+    void atendenteTambemPodeConsultarSeProdutoPossuiReceita() {
+        loginAs(Role.ATTENDANT);
+
+        Product product = product("Cappuccino", true);
+
+        when(recipeItemRepository.findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        )).thenReturn(List.of(5L));
+
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product)
+        );
+
+        assertThat(result).containsExactly(5L);
+    }
+
+    @Test
+    void estoquistaTambemPodeConsultarSeProdutoPossuiReceita() {
+        loginAs(Role.STOCKIST);
+
+        Product product = product("Cappuccino", true);
+
+        when(recipeItemRepository.findProductIdsWithRecipe(
+                ESTABLISHMENT_ID,
+                List.of(5L)
+        )).thenReturn(List.of(5L));
+
+        Set<Long> result = service.findProductIdsWithRecipe(
+                AUTH_USER,
+                List.of(product)
+        );
+
+        assertThat(result).containsExactly(5L);
     }
 
     // =====================================================
@@ -431,7 +704,9 @@ class ProductServiceTest {
     @EnumSource(value = Role.class, names = {"OWNER", "MANAGER", "STOCKIST", "ATTENDANT"})
     void todosOsPerfisConsultamProdutoAtivo(Role role) {
         loginAs(role);
+
         Product product = product("Cappuccino", true);
+
         when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
 
@@ -442,7 +717,9 @@ class ProductServiceTest {
     @EnumSource(value = Role.class, names = {"OWNER", "MANAGER", "STOCKIST"})
     void perfisSemRestricaoConsultamProdutoInativo(Role role) {
         loginAs(role);
+
         Product product = product("Cappuccino", false);
+
         when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product));
 
@@ -452,6 +729,7 @@ class ProductServiceTest {
     @Test
     void atendenteRecebeNaoEncontradoParaProdutoInativo() {
         loginAs(Role.ATTENDANT);
+
         when(productRepository.findByIdAndEstablishmentId(5L, ESTABLISHMENT_ID))
                 .thenReturn(Optional.of(product("Cappuccino", false)));
 
@@ -483,15 +761,25 @@ class ProductServiceTest {
     void atualizaNomeDescricaoEPreco() {
         Product product = product("Cappuccino", true);
         stubLock(product);
-        when(productRepository.existsByNameExcludingId(ESTABLISHMENT_ID, 5L, "Cappuccino Grande"))
-                .thenReturn(false);
+
+        when(productRepository.existsByNameExcludingId(
+                ESTABLISHMENT_ID,
+                5L,
+                "Cappuccino Grande"
+        )).thenReturn(false);
 
         Product updated = service.update(
-                AUTH_USER, 5L, "Cappuccino Grande", "Maior", new BigDecimal("15.9"));
+                AUTH_USER,
+                5L,
+                "Cappuccino Grande",
+                "Maior",
+                new BigDecimal("15.9")
+        );
 
         assertThat(updated.getName()).isEqualTo("Cappuccino Grande");
         assertThat(updated.getDescription()).isEqualTo("Maior");
         assertThat(updated.getPrice()).isEqualByComparingTo("15.90");
+
         verify(productRepository).saveAndFlush(product);
     }
 
@@ -501,12 +789,19 @@ class ProductServiceTest {
         stubLock(product);
 
         Product updated = service.update(
-                AUTH_USER, 5L, null, null, new BigDecimal("20.00"));
+                AUTH_USER,
+                5L,
+                null,
+                null,
+                new BigDecimal("20.00")
+        );
 
         assertThat(updated.getName()).isEqualTo("Cappuccino");
         assertThat(updated.getDescription()).isEqualTo("Descrição");
         assertThat(updated.getPrice()).isEqualByComparingTo("20.00");
-        verify(productRepository, never()).existsByNameExcludingId(any(), any(), any());
+
+        verify(productRepository, never())
+                .existsByNameExcludingId(any(), any(), any());
     }
 
     @Test
@@ -521,7 +816,13 @@ class ProductServiceTest {
 
     @Test
     void nenhumCampoNaAtualizacaoLancaRegraDeNegocio() {
-        assertThatThrownBy(() -> service.update(AUTH_USER, 5L, null, null, null))
+        assertThatThrownBy(() -> service.update(
+                AUTH_USER,
+                5L,
+                null,
+                null,
+                null
+        ))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("Informe ao menos um campo para atualizar.");
 
@@ -532,7 +833,13 @@ class ProductServiceTest {
     void nomeEmBrancoNaAtualizacaoLancaRegraDeNegocio() {
         stubLock(product("Cappuccino", true));
 
-        assertThatThrownBy(() -> service.update(AUTH_USER, 5L, "   ", null, null))
+        assertThatThrownBy(() -> service.update(
+                AUTH_USER,
+                5L,
+                "   ",
+                null,
+                null
+        ))
                 .isInstanceOf(BusinessRuleException.class)
                 .hasMessage("O nome não pode ficar em branco.");
 
@@ -542,10 +849,20 @@ class ProductServiceTest {
     @Test
     void renomearParaNomeExistenteLancaConflito() {
         stubLock(product("Cappuccino", true));
-        when(productRepository.existsByNameExcludingId(ESTABLISHMENT_ID, 5L, "Espresso"))
-                .thenReturn(true);
 
-        assertThatThrownBy(() -> service.update(AUTH_USER, 5L, "Espresso", null, null))
+        when(productRepository.existsByNameExcludingId(
+                ESTABLISHMENT_ID,
+                5L,
+                "Espresso"
+        )).thenReturn(true);
+
+        assertThatThrownBy(() -> service.update(
+                AUTH_USER,
+                5L,
+                "Espresso",
+                null,
+                null
+        ))
                 .isInstanceOf(BusinessConflictException.class)
                 .hasMessage("Já existe um produto com este nome.");
 
@@ -557,19 +874,30 @@ class ProductServiceTest {
         stubLock(product("Cappuccino", true));
 
         assertThatThrownBy(() -> service.update(
-                AUTH_USER, 5L, null, null, new BigDecimal("-5.00")))
-                .isInstanceOf(BusinessRuleException.class);
+                AUTH_USER,
+                5L,
+                null,
+                null,
+                new BigDecimal("-5.00")
+        )).isInstanceOf(BusinessRuleException.class);
 
         verify(productRepository, never()).saveAndFlush(any());
     }
 
     @Test
     void atualizarProdutoInexistenteLancaNaoEncontrado() {
-        when(productRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
-                .thenReturn(Optional.empty());
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(
+                99L,
+                ESTABLISHMENT_ID
+        )).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.update(
-                AUTH_USER, 99L, "Novo", null, null))
+                AUTH_USER,
+                99L,
+                "Novo",
+                null,
+                null
+        ))
                 .isInstanceOf(ResourceNotFoundException.class)
                 .hasMessage("Produto não encontrado.");
     }
@@ -580,10 +908,15 @@ class ProductServiceTest {
         loginAs(role);
 
         assertThatThrownBy(() -> service.update(
-                AUTH_USER, 5L, "Novo", null, null))
-                .isInstanceOf(AccessDeniedException.class);
+                AUTH_USER,
+                5L,
+                "Novo",
+                null,
+                null
+        )).isInstanceOf(AccessDeniedException.class);
 
-        verify(productRepository, never()).findByIdAndEstablishmentIdForUpdate(any(), any());
+        verify(productRepository, never())
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 
     // =====================================================
@@ -598,6 +931,7 @@ class ProductServiceTest {
         Product result = service.setActive(AUTH_USER, 5L, false);
 
         assertThat(result.isActive()).isFalse();
+
         verify(productRepository).saveAndFlush(product);
     }
 
@@ -609,13 +943,16 @@ class ProductServiceTest {
         Product result = service.setActive(AUTH_USER, 5L, true);
 
         assertThat(result.isActive()).isTrue();
+
         verify(productRepository).saveAndFlush(product);
     }
 
     @Test
     void alterarStatusDeProdutoInexistenteLancaNaoEncontrado() {
-        when(productRepository.findByIdAndEstablishmentIdForUpdate(99L, ESTABLISHMENT_ID))
-                .thenReturn(Optional.empty());
+        when(productRepository.findByIdAndEstablishmentIdForUpdate(
+                99L,
+                ESTABLISHMENT_ID
+        )).thenReturn(Optional.empty());
 
         assertThatThrownBy(() -> service.setActive(AUTH_USER, 99L, false))
                 .isInstanceOf(ResourceNotFoundException.class);
@@ -626,9 +963,13 @@ class ProductServiceTest {
     void perfisSemPermissaoNaoPodemAlterarStatus(Role role) {
         loginAs(role);
 
-        assertThatThrownBy(() -> service.setActive(AUTH_USER, 5L, false))
-                .isInstanceOf(AccessDeniedException.class);
+        assertThatThrownBy(() -> service.setActive(
+                AUTH_USER,
+                5L,
+                false
+        )).isInstanceOf(AccessDeniedException.class);
 
-        verify(productRepository, never()).findByIdAndEstablishmentIdForUpdate(any(), any());
+        verify(productRepository, never())
+                .findByIdAndEstablishmentIdForUpdate(any(), any());
     }
 }

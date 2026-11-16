@@ -9,6 +9,7 @@ import com.coffeepilot.api.security.AuthenticatedUser;
 
 import jakarta.validation.Valid;
 
+import org.springframework.data.domain.Page;
 import org.springframework.data.domain.Pageable;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.Set;
 
 @RestController
 @RequestMapping("/products")
@@ -44,7 +47,7 @@ public class ProductController {
                 request.description(),
                 request.price());
 
-        return ProductResponse.from(product);
+        return ProductResponse.from(product, false);
     }
 
     @GetMapping
@@ -54,9 +57,26 @@ public class ProductController {
             @RequestParam(required = false) String search,
             Pageable pageable) {
 
+        Page<Product> products = productService.list(
+                authenticatedUser,
+                active,
+                search,
+                pageable
+        );
+
+        Set<Long> productIdsWithRecipe =
+                productService.findProductIdsWithRecipe(
+                        authenticatedUser,
+                        products.getContent()
+                );
+
         return PageResponse.from(
-                productService.list(authenticatedUser, active, search, pageable),
-                ProductResponse::from);
+                products,
+                product -> ProductResponse.from(
+                        product,
+                        productIdsWithRecipe.contains(product.getId())
+                )
+        );
     }
 
     @GetMapping("/{productId}")
@@ -64,8 +84,17 @@ public class ProductController {
             @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
             @PathVariable Long productId) {
 
-        return ProductResponse.from(
-                productService.get(authenticatedUser, productId));
+        Product product = productService.get(
+                authenticatedUser,
+                productId
+        );
+
+        boolean hasRecipe = productService.findProductIdsWithRecipe(
+                authenticatedUser,
+                java.util.List.of(product)
+        ).contains(product.getId());
+
+        return ProductResponse.from(product, hasRecipe);
     }
 
     @PatchMapping("/{productId}")
@@ -81,7 +110,12 @@ public class ProductController {
                 request.description(),
                 request.price());
 
-        return ProductResponse.from(product);
+        boolean hasRecipe = productService.findProductIdsWithRecipe(
+                authenticatedUser,
+                java.util.List.of(product)
+        ).contains(product.getId());
+
+        return ProductResponse.from(product, hasRecipe);
     }
 
     @PatchMapping("/{productId}/status")
@@ -95,6 +129,11 @@ public class ProductController {
                 productId,
                 request.active());
 
-        return ProductResponse.from(product);
+        boolean hasRecipe = productService.findProductIdsWithRecipe(
+                authenticatedUser,
+                java.util.List.of(product)
+        ).contains(product.getId());
+
+        return ProductResponse.from(product, hasRecipe);
     }
 }

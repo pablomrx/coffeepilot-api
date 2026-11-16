@@ -3,6 +3,7 @@ package com.coffeepilot.api.product;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
+import com.coffeepilot.api.recipe.RecipeItemRepository;
 import com.coffeepilot.api.security.ActiveUserProvider;
 import com.coffeepilot.api.security.AuthenticatedUser;
 import com.coffeepilot.api.user.Role;
@@ -16,7 +17,11 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.Collection;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Locale;
+import java.util.Set;
 
 @Service
 public class ProductService {
@@ -38,13 +43,16 @@ public class ProductService {
 
     private final ActiveUserProvider activeUserProvider;
     private final ProductRepository productRepository;
+    private final RecipeItemRepository recipeItemRepository;
 
     public ProductService(
             ActiveUserProvider activeUserProvider,
-            ProductRepository productRepository
+            ProductRepository productRepository,
+            RecipeItemRepository recipeItemRepository
     ) {
         this.activeUserProvider = activeUserProvider;
         this.productRepository = productRepository;
+        this.recipeItemRepository = recipeItemRepository;
     }
 
     @Transactional
@@ -105,6 +113,38 @@ public class ProductService {
                 effectiveActive,
                 toSearchPattern(search),
                 sanitize(pageable)
+        );
+    }
+
+    @Transactional(readOnly = true)
+    public Set<Long> findProductIdsWithRecipe(
+            AuthenticatedUser authenticatedUser,
+            Collection<Product> products
+    ) {
+        User actor = activeUserProvider.require(
+                authenticatedUser,
+                PRODUCT_READ_ROLES
+        );
+
+        if (products == null || products.isEmpty()) {
+            return Set.of();
+        }
+
+        Long establishmentId = actor.getEstablishment().getId();
+
+        List<Long> productIds = products.stream()
+                .map(Product::getId)
+                .toList();
+
+        if (productIds.isEmpty()) {
+            return Set.of();
+        }
+
+        return new HashSet<>(
+                recipeItemRepository.findProductIdsWithRecipe(
+                        establishmentId,
+                        productIds
+                )
         );
     }
 

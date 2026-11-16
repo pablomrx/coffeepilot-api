@@ -11,17 +11,19 @@ public record ProductResponse(
         String description,
         BigDecimal price,
         boolean active,
+        boolean hasRecipe,
         OffsetDateTime createdAt,
         OffsetDateTime updatedAt
 ) {
 
-    public static ProductResponse from(Product product) {
+    public static ProductResponse from(Product product, boolean hasRecipe) {
         return new ProductResponse(
                 product.getId(),
                 product.getName(),
                 product.getDescription(),
                 product.getPrice(),
                 product.isActive(),
+                hasRecipe,
                 product.getCreatedAt(),
                 product.getUpdatedAt()
         );

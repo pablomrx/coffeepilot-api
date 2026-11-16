@@ -25,8 +25,8 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
     );
 
     // Linhas das receitas de vários produtos em uma única consulta, sem
-    // carregar a entidade Ingrediente (ver RecipeLineView). Usado pelo
-    // pedido para calcular o consumo antes de bloquear os ingredientes.
+    // carregar a entidade Ingrediente (ver RecipeLineView).
+    // Usado pelo pedido para calcular o consumo antes de bloquear os ingredientes.
     @Query("""
             SELECT new com.coffeepilot.api.recipe.RecipeLineView(
                 r.productId, r.ingredient.id, r.quantity)
@@ -36,6 +36,19 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
             ORDER BY r.productId, r.ingredient.id
             """)
     List<RecipeLineView> findLinesByProducts(
+            @Param("establishmentId") Long establishmentId,
+            @Param("productIds") Collection<Long> productIds
+    );
+
+    // Retorna os IDs dos produtos que possuem receita em uma única consulta.
+    // Não carrega ingredientes nem quantidades.
+    @Query("""
+            SELECT DISTINCT r.productId
+            FROM RecipeItem r
+            WHERE r.establishmentId = :establishmentId
+              AND r.productId IN :productIds
+            """)
+    List<Long> findProductIdsWithRecipe(
             @Param("establishmentId") Long establishmentId,
             @Param("productIds") Collection<Long> productIds
     );
