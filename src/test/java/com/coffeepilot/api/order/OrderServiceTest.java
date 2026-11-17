@@ -1,8 +1,8 @@
-
 package com.coffeepilot.api.order;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.assertj.core.groups.Tuple.tuple;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.inOrder;
@@ -40,11 +40,11 @@ import org.springframework.data.domain.Sort;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.test.util.ReflectionTestUtils;
 
-import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
 import com.coffeepilot.api.common.exception.InsufficientStockException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
+import com.coffeepilot.api.establishment.Establishment;
 import com.coffeepilot.api.ingredient.IngredientRepository;
 import com.coffeepilot.api.order.OrderService.OrderLine;
 import com.coffeepilot.api.product.Product;
@@ -257,6 +257,12 @@ class OrderServiceTest {
         // 1 x 12.50 + 2 x 9.00
         assertThat(order.getTotal()).isEqualByComparingTo("30.50");
 
+        // Um pedido novo ainda não tem início, conclusão nem cancelamento.
+        assertThat(order.getStartedAt()).isNull();
+        assertThat(order.getStartedBy()).isNull();
+        assertThat(order.getCompletedAt()).isNull();
+        assertThat(order.getCompletedBy()).isNull();
+
         // Os itens seguem a ordem crescente de id do produto (3 e 7),
         // independentemente da ordem enviada e do nome.
         assertThat(order.getItems())
@@ -382,8 +388,8 @@ class OrderServiceTest {
         assertThat(order.getItems())
                 .extracting(OrderItem::getProductName, OrderItem::isStockTracked)
                 .containsExactly(
-                        org.assertj.core.groups.Tuple.tuple("Cappuccino", true),
-                        org.assertj.core.groups.Tuple.tuple("Agua", false));
+                        tuple("Cappuccino", true),
+                        tuple("Agua", false));
 
         verify(stockService).consumeForOrder(
                 eq(user), eq(ORDER_ID), any(), requiredCaptor.capture());
@@ -797,7 +803,7 @@ class OrderServiceTest {
         assertThat(result.getStartedBy()).isSameAs(user);
         assertThat(result.getStartedAt()).isNotNull();
         assertThat(result.getCompletedBy()).isNull();
-
+        assertThat(result.getCompletedAt()).isNull();
         verify(orderRepository).saveAndFlush(order);
         verifyNoStockEffect();
     }
@@ -851,9 +857,9 @@ class OrderServiceTest {
         assertThat(result.getStatus()).isEqualTo(OrderStatus.COMPLETED);
         assertThat(result.getCompletedAt()).isNotNull();
         assertThat(result.getCompletedBy()).isSameAs(user);
-        assertThat(result.getStartedBy()).isSameAs(user);
+        // O início continua registrado depois da conclusão.
         assertThat(result.getStartedAt()).isNotNull();
-
+        assertThat(result.getStartedBy()).isSameAs(user);
         verify(orderRepository).saveAndFlush(order);
     }
 
@@ -907,8 +913,7 @@ class OrderServiceTest {
         assertThat(result.getCancelledBy()).isSameAs(user);
         assertThat(result.getCancelledAt()).isNotNull();
         assertThat(result.getCancellationReason()).isNull();
-
-        // Um pedido cancelado enquanto pendente nunca iniciou a preparação.
+        // Pedido cancelado ainda pendente nunca foi iniciado.
         assertThat(result.getStartedAt()).isNull();
         assertThat(result.getStartedBy()).isNull();
 
@@ -940,10 +945,10 @@ class OrderServiceTest {
         assertThat(result.getCancelledFromStatus())
                 .isEqualTo(OrderStatus.IN_PREPARATION);
         assertThat(result.getCancellationReason()).isEqualTo("Cliente foi embora");
-
-        // O cancelamento não apaga a auditoria do início da preparação.
+        // O início é preservado: exigido pelo ck_orders_started no banco.
         assertThat(result.getStartedAt()).isNotNull();
         assertThat(result.getStartedBy()).isSameAs(user);
+        assertThat(result.getCompletedBy()).isNull();
 
         verify(stockService, never()).reverseOrderConsumption(any(), any(), any());
         verify(orderRepository).saveAndFlush(order);
