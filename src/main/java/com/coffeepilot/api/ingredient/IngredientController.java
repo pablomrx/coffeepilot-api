@@ -2,6 +2,7 @@ package com.coffeepilot.api.ingredient;
 
 import com.coffeepilot.api.common.dto.PageResponse;
 import com.coffeepilot.api.ingredient.dto.CreateIngredientRequest;
+import com.coffeepilot.api.ingredient.dto.IngredientProductResponse;
 import com.coffeepilot.api.ingredient.dto.IngredientResponse;
 import com.coffeepilot.api.ingredient.dto.UpdateIngredientRequest;
 import com.coffeepilot.api.ingredient.dto.UpdateIngredientStatusRequest;
@@ -21,6 +22,8 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
+
+import java.util.List;
 
 @RestController
 @RequestMapping("/ingredients")
@@ -68,6 +71,17 @@ public class IngredientController {
 
         return IngredientResponse.from(
                 ingredientService.get(authenticatedUser, ingredientId));
+    }
+
+    @GetMapping("/{ingredientId}/products")
+    public List<IngredientProductResponse> products(
+            @AuthenticationPrincipal AuthenticatedUser authenticatedUser,
+            @PathVariable Long ingredientId) {
+
+        return ingredientService.listProducts(authenticatedUser, ingredientId)
+                .stream()
+                .map(IngredientProductResponse::from)
+                .toList();
     }
 
     @PatchMapping("/{ingredientId}")

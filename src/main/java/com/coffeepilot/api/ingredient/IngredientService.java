@@ -2,7 +2,10 @@ package com.coffeepilot.api.ingredient;
 
 import com.coffeepilot.api.common.exception.BusinessConflictException;
 import com.coffeepilot.api.common.exception.BusinessRuleException;
+import com.coffeepilot.api.common.exception.IngredientInUseException;
 import com.coffeepilot.api.common.exception.ResourceNotFoundException;
+import com.coffeepilot.api.recipe.IngredientProductView;
+import com.coffeepilot.api.recipe.RecipeItemRepository;
 import com.coffeepilot.api.security.ActiveUserProvider;
 import com.coffeepilot.api.security.AuthenticatedUser;
 import com.coffeepilot.api.stock.StockService;
@@ -17,6 +20,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 import java.math.BigDecimal;
+import java.util.List;
 
 @Service
 public class IngredientService {
@@ -32,15 +36,18 @@ public class IngredientService {
     private final ActiveUserProvider activeUserProvider;
     private final IngredientRepository ingredientRepository;
     private final StockService stockService;
+    private final RecipeItemRepository recipeItemRepository;
 
     public IngredientService(
             ActiveUserProvider activeUserProvider,
             IngredientRepository ingredientRepository,
-            StockService stockService
+            StockService stockService,
+            RecipeItemRepository recipeItemRepository
     ) {
         this.activeUserProvider = activeUserProvider;
         this.ingredientRepository = ingredientRepository;
         this.stockService = stockService;
+        this.recipeItemRepository = recipeItemRepository;
     }
 
     @Transactional
@@ -213,10 +220,50 @@ public class IngredientService {
         if (active) {
             ingredient.activate();
         } else {
+            // Só bloqueia se ainda estiver ativo: desativar de novo é idempotente.
+            if (ingredient.isActive()) {
+                List<IngredientProductView> activeProducts =
+                        recipeItemRepository.findActiveProductsByIngredient(
+                                ingredient.getEstablishmentId(),
+                                ingredient.getId()
+                        );
+
+                if (!activeProducts.isEmpty()) {
+                    throw new IngredientInUseException(
+                            activeProducts.stream()
+                                    .map(p -> new IngredientInUseException
+                                            .AffectedProduct(p.id(), p.name()))
+                                    .toList()
+                    );
+                }
+            }
+
             ingredient.deactivate();
         }
 
         return ingredientRepository.saveAndFlush(ingredient);
+    }
+
+    @Transactional(readOnly = true)
+    public List<IngredientProductView> listProducts(
+            AuthenticatedUser authenticatedUser,
+            Long ingredientId
+    ) {
+        User actor = activeUserProvider.require(
+                authenticatedUser,
+                INGREDIENT_ROLES
+        );
+
+        Long establishmentId = actor.getEstablishment().getId();
+
+        ingredientRepository
+                .findByIdAndEstablishmentId(ingredientId, establishmentId)
+                .orElseThrow(this::notFound);
+
+        return recipeItemRepository.findProductsByIngredient(
+                establishmentId,
+                ingredientId
+        );
     }
 
     private Ingredient lockIngredient(User actor, Long ingredientId) {

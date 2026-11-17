@@ -1,5 +1,7 @@
+
 package com.coffeepilot.api.recipe;
 
+import com.coffeepilot.api.product.Product;
 import org.springframework.data.jpa.repository.JpaRepository;
 import org.springframework.data.jpa.repository.Modifying;
 import org.springframework.data.jpa.repository.Query;
@@ -51,6 +53,39 @@ public interface RecipeItemRepository extends JpaRepository<RecipeItem, Long> {
     List<Long> findProductIdsWithRecipe(
             @Param("establishmentId") Long establishmentId,
             @Param("productIds") Collection<Long> productIds
+    );
+
+    // Produtos (ativos e inativos) que usam o ingrediente, por nome.
+    @Query("""
+            SELECT new com.coffeepilot.api.recipe.IngredientProductView(
+                p.id, p.name, p.active)
+            FROM RecipeItem r, Product p
+            WHERE r.establishmentId = :establishmentId
+              AND r.ingredient.id = :ingredientId
+              AND p.id = r.productId
+              AND p.establishmentId = r.establishmentId
+            ORDER BY p.name, p.id
+            """)
+    List<IngredientProductView> findProductsByIngredient(
+            @Param("establishmentId") Long establishmentId,
+            @Param("ingredientId") Long ingredientId
+    );
+
+    // Somente produtos ativos: são os que impedem a desativação.
+    @Query("""
+            SELECT new com.coffeepilot.api.recipe.IngredientProductView(
+                p.id, p.name, p.active)
+            FROM RecipeItem r, Product p
+            WHERE r.establishmentId = :establishmentId
+              AND r.ingredient.id = :ingredientId
+              AND p.id = r.productId
+              AND p.establishmentId = r.establishmentId
+              AND p.active = TRUE
+            ORDER BY p.name, p.id
+            """)
+    List<IngredientProductView> findActiveProductsByIngredient(
+            @Param("establishmentId") Long establishmentId,
+            @Param("ingredientId") Long ingredientId
     );
 
     // Remove todos os itens da receita de um produto.

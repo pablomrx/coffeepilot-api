@@ -123,6 +123,26 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    @ExceptionHandler(IngredientInUseException.class)
+    public ResponseEntity<IngredientInUseResponse> handleIngredientInUse(
+            IngredientInUseException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.CONFLICT;
+
+        IngredientInUseResponse body = new IngredientInUseResponse(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of(),
+                ex.getProducts()
+        );
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(BusinessRuleException.class)
     public ResponseEntity<ApiError> handleBusinessRule(
             BusinessRuleException ex,

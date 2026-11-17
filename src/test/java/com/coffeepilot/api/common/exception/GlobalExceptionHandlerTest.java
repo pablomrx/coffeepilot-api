@@ -5,6 +5,7 @@ import static org.assertj.core.groups.Tuple.tuple;
 
 import java.lang.reflect.Method;
 import java.sql.SQLException;
+import java.util.List;
 
 import org.hibernate.exception.ConstraintViolationException;
 import org.junit.jupiter.api.Test;
@@ -143,6 +144,21 @@ class GlobalExceptionHandlerTest {
         assertThat(response.getStatusCode().value()).isEqualTo(409);
         assertThat(response.getBody().message())
                 .isEqualTo("Esta movimentação já foi estornada.");
+    }
+
+    @Test
+    void ingredienteEmUsoVira409ComProdutosAfetados() {
+        var response = handler.handleIngredientInUse(
+                new IngredientInUseException(List.of(
+                        new IngredientInUseException.AffectedProduct(3L, "Cappuccino"))),
+                request);
+
+        assertThat(response.getStatusCode().value()).isEqualTo(409);
+        assertThat(response.getBody().affectedProducts())
+                .extracting(IngredientInUseException.AffectedProduct::id,
+                        IngredientInUseException.AffectedProduct::name)
+                .containsExactly(tuple(3L, "Cappuccino"));
+        assertThat(response.getBody().fieldErrors()).isEmpty();
     }
 
     @Test
