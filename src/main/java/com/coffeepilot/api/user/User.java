@@ -19,6 +19,7 @@ import org.hibernate.annotations.UpdateTimestamp;
 
 import java.time.OffsetDateTime;
 import java.util.Locale;
+import java.util.Objects;
 
 @Entity
 @Table(name = "users")
@@ -38,7 +39,7 @@ public class User {
     @Column(nullable = false, length = 254)
     private String email;
 
-    @Column(name = "password_hash", nullable = false, length = 255)
+    @Column(name = "password_hash", length = 255)
     private String passwordHash;
 
     @Enumerated(EnumType.STRING)
@@ -47,6 +48,15 @@ public class User {
 
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
+
+    @Column(name = "email_confirmed_at")
+    private OffsetDateTime emailConfirmedAt;
+
+    @Column(name = "password_changed_at")
+    private OffsetDateTime passwordChangedAt;
+
+    @Column(name = "token_version", nullable = false)
+    private int tokenVersion = 0;
 
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
@@ -71,6 +81,37 @@ public class User {
         this.email = normalizeEmail(email);
         this.passwordHash = passwordHash;
         this.role = role;
+    }
+
+    public static User invited(
+            Establishment establishment,
+            String name,
+            String email,
+            Role role
+    ) {
+        return new User(establishment, name, email, null, role);
+    }
+
+    public static User confirmed(
+            Establishment establishment,
+            String name,
+            String email,
+            String passwordHash,
+            Role role,
+            OffsetDateTime now
+    ) {
+        Objects.requireNonNull(now, "O instante é obrigatório.");
+
+        if (passwordHash == null || passwordHash.isBlank()) {
+            throw new IllegalArgumentException(
+                    "Conta confirmada exige senha."
+            );
+        }
+
+        User user = new User(establishment, name, email, passwordHash, role);
+        user.emailConfirmedAt = now;
+
+        return user;
     }
 
     public static String normalizeEmail(String email) {
@@ -103,8 +144,73 @@ public class User {
         return passwordHash;
     }
 
-    public void changePasswordHash(String passwordHash) {
+    public boolean hasPassword() {
+        return passwordHash != null;
+    }
+
+    public void definePassword(String passwordHash, OffsetDateTime now) {
+        Objects.requireNonNull(now, "O instante é obrigatório.");
+
+        if (passwordHash == null || passwordHash.isBlank()) {
+            throw new IllegalArgumentException(
+                    "O hash da senha é obrigatório."
+            );
+        }
+
         this.passwordHash = passwordHash;
+        this.passwordChangedAt = now;
+        this.tokenVersion++;
+    }
+
+    public boolean isEmailConfirmed() {
+        return emailConfirmedAt != null;
+    }
+
+    public OffsetDateTime getEmailConfirmedAt() {
+        return emailConfirmedAt;
+    }
+
+    public void confirmEmail(OffsetDateTime now) {
+        Objects.requireNonNull(now, "O instante é obrigatório.");
+
+        if (!hasPassword()) {
+            throw new IllegalStateException(
+                    "Não é possível confirmar o e-mail de uma conta sem senha."
+            );
+        }
+
+        if (emailConfirmedAt == null) {
+            this.emailConfirmedAt = now;
+        }
+    }
+
+    public void acceptInvite(String passwordHash, OffsetDateTime now) {
+        Objects.requireNonNull(now, "O instante é obrigatório.");
+
+        if (!isInvitePending()) {
+            throw new IllegalStateException(
+                    "Esta conta não possui convite pendente."
+            );
+        }
+
+        definePassword(passwordHash, now);
+        confirmEmail(now);
+    }
+
+    public boolean isInvitePending() {
+        return !hasPassword() && !isEmailConfirmed();
+    }
+
+    public OffsetDateTime getPasswordChangedAt() {
+        return passwordChangedAt;
+    }
+
+    public int getTokenVersion() {
+        return tokenVersion;
+    }
+
+    public void invalidateSessions() {
+        this.tokenVersion++;
     }
 
     public Role getRole() {
@@ -112,6 +218,10 @@ public class User {
     }
 
     public void setRole(Role role) {
+        if (this.role != null && this.role != role) {
+            this.tokenVersion++;
+        }
+
         this.role = role;
     }
 
@@ -120,6 +230,10 @@ public class User {
     }
 
     public void setActive(boolean active) {
+        if (this.active && !active) {
+            this.tokenVersion++;
+        }
+
         this.active = active;
     }
 
