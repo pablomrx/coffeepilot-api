@@ -10,8 +10,11 @@ import jakarta.persistence.Table;
 import org.hibernate.annotations.CreationTimestamp;
 import org.hibernate.annotations.UpdateTimestamp;
 
+import java.time.Clock;
+import java.time.Duration;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
+import java.time.temporal.ChronoUnit;
 
 @Entity
 @Table(name = "establishments")
@@ -32,6 +35,12 @@ public class Establishment {
     @Column(name = "is_active", nullable = false)
     private boolean active = true;
 
+    @Column(name = "is_demo", nullable = false, updatable = false)
+    private boolean demo = false;
+
+    @Column(name = "demo_expires_at", updatable = false)
+    private OffsetDateTime demoExpiresAt;
+
     @CreationTimestamp
     @Column(name = "created_at", nullable = false, updatable = false)
     private OffsetDateTime createdAt;
@@ -50,6 +59,32 @@ public class Establishment {
     public Establishment(String name, String timeZone) {
         this.name = name;
         this.timeZone = validateTimeZone(timeZone);
+    }
+
+    public static Establishment demo(
+            String name,
+            Duration ttl,
+            Clock clock
+    ) {
+        if (clock == null) {
+            throw new IllegalArgumentException(
+                    "O relógio é obrigatório."
+            );
+        }
+
+        if (ttl == null || ttl.isZero() || ttl.isNegative()) {
+            throw new IllegalArgumentException(
+                    "A duração da demonstração deve ser positiva."
+            );
+        }
+
+        Establishment establishment = new Establishment(name);
+        establishment.demo = true;
+        establishment.demoExpiresAt = OffsetDateTime.now(clock)
+                .plus(ttl)
+                .truncatedTo(ChronoUnit.MICROS);
+
+        return establishment;
     }
 
     public Long getId() {
@@ -82,6 +117,24 @@ public class Establishment {
 
     public void setActive(boolean active) {
         this.active = active;
+    }
+
+    public boolean isDemo() {
+        return demo;
+    }
+
+    public OffsetDateTime getDemoExpiresAt() {
+        return demoExpiresAt;
+    }
+
+    public boolean isDemoExpired(OffsetDateTime now) {
+        return demo
+                && demoExpiresAt != null
+                && !now.isBefore(demoExpiresAt);
+    }
+
+    public boolean isUsable(OffsetDateTime now) {
+        return active && !isDemoExpired(now);
     }
 
     public OffsetDateTime getCreatedAt() {
