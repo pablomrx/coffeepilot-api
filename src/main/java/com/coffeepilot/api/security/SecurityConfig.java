@@ -22,6 +22,7 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 
 import tools.jackson.databind.ObjectMapper;
 
+import java.time.Clock;
 import java.util.Arrays;
 import java.util.List;
 
@@ -45,9 +46,10 @@ public class SecurityConfig {
     @Bean
     public JwtAuthenticationFilter jwtAuthenticationFilter(
             JwtService jwtService,
-            UserRepository userRepository
+            UserRepository userRepository,
+            Clock clock
     ) {
-        return new JwtAuthenticationFilter(jwtService, userRepository);
+        return new JwtAuthenticationFilter(jwtService, userRepository, clock);
     }
 
     @Bean
@@ -66,10 +68,7 @@ public class SecurityConfig {
     public CorsConfigurationSource corsConfigurationSource(
             @Value("${cors.allowed-origins:http://localhost:5173}") String origins
     ) {
-        List<String> allowedOrigins = Arrays.stream(origins.split(","))
-                .map(String::trim)
-                .filter(origin -> !origin.isEmpty())
-                .toList();
+        List<String> allowedOrigins = parseAllowedOrigins(origins);
 
         CorsConfiguration config = new CorsConfiguration();
         config.setAllowedOrigins(allowedOrigins);
@@ -84,6 +83,31 @@ public class SecurityConfig {
         source.registerCorsConfiguration("/**", config);
 
         return source;
+    }
+
+    static List<String> parseAllowedOrigins(String origins) {
+        List<String> allowedOrigins = origins == null
+                ? List.of()
+                : Arrays.stream(origins.split(","))
+                  .map(String::trim)
+                  .filter(origin -> !origin.isEmpty())
+                  .toList();
+
+        if (allowedOrigins.isEmpty()) {
+            throw new IllegalStateException(
+                    "cors.allowed-origins (CORS_ALLOWED_ORIGINS) deve "
+                            + "informar ao menos uma origem."
+            );
+        }
+
+        if (allowedOrigins.stream().anyMatch(origin -> origin.contains("*"))) {
+            throw new IllegalStateException(
+                    "cors.allowed-origins (CORS_ALLOWED_ORIGINS) não pode "
+                            + "conter curinga (*)."
+            );
+        }
+
+        return allowedOrigins;
     }
 
     @Bean

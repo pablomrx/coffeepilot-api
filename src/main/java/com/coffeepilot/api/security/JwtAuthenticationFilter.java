@@ -16,6 +16,8 @@ import org.springframework.security.core.context.SecurityContextHolder;
 import org.springframework.web.filter.OncePerRequestFilter;
 
 import java.io.IOException;
+import java.time.Clock;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Optional;
 
@@ -25,13 +27,16 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
 
     private final JwtService jwtService;
     private final UserRepository userRepository;
+    private final Clock clock;
 
     public JwtAuthenticationFilter(
             JwtService jwtService,
-            UserRepository userRepository
+            UserRepository userRepository,
+            Clock clock
     ) {
         this.jwtService = jwtService;
         this.userRepository = userRepository;
+        this.clock = clock;
     }
 
     @Override
@@ -51,22 +56,29 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
     }
 
     private void authenticate(String token) {
-        Optional<Long> userId = jwtService.extractUserId(token);
+        SecurityContextHolder.clearContext();
 
-        if (userId.isEmpty()) {
+        Optional<JwtService.TokenClaims> claims = jwtService.parse(token);
+
+        if (claims.isEmpty()) {
             return;
         }
 
         Optional<User> userOptional =
-                userRepository.findWithEstablishmentById(userId.get());
+                userRepository.findWithEstablishmentById(claims.get().userId());
 
         if (userOptional.isEmpty()) {
             return;
         }
 
         User user = userOptional.get();
+        OffsetDateTime now = OffsetDateTime.now(clock);
 
-        if (!user.isActive() || !user.getEstablishment().isActive()) {
+        if (!user.isActive() || !user.getEstablishment().isUsable(now)) {
+            return;
+        }
+
+        if (user.getTokenVersion() != claims.get().tokenVersion()) {
             return;
         }
 
