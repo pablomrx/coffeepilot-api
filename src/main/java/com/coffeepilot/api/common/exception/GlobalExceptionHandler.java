@@ -62,6 +62,26 @@ public class GlobalExceptionHandler {
                 .body(body);
     }
 
+    @ExceptionHandler(EmailNotConfirmedException.class)
+    public ResponseEntity<CodedApiError> handleEmailNotConfirmed(
+            EmailNotConfirmedException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.FORBIDDEN;
+
+        CodedApiError body = new CodedApiError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of(),
+                ex.getCode()
+        );
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ResponseEntity<ApiError> handleEmailAlreadyUsed(
             EmailAlreadyUsedException ex,
