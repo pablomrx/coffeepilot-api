@@ -41,12 +41,14 @@ public class AuthenticationService {
                 .findByEmail(User.normalizeEmail(email))
                 .orElse(null);
 
+        boolean hasCredential = user != null && user.hasPassword();
+
         boolean passwordWithinLimit =
                 rawPassword.getBytes(StandardCharsets.UTF_8).length
                         <= BCRYPT_MAX_BYTES;
 
         String hashToCheck =
-                user != null ? user.getPasswordHash() : dummyHash;
+                hasCredential ? user.getPasswordHash() : dummyHash;
 
         boolean passwordMatches;
 
@@ -58,11 +60,14 @@ public class AuthenticationService {
             passwordMatches = false;
         }
 
-        if (user == null
+        if (!hasCredential
                 || !passwordWithinLimit
                 || !passwordMatches
                 || !user.isActive()
-                || !user.getEstablishment().isActive()) {
+                || !user.getEstablishment().isActive()
+                // Sandbox não tem login por senha: o acesso é pela criação
+                // da sessão de demonstração.
+                || user.getEstablishment().isDemo()) {
             throw new BadCredentialsException(INVALID_CREDENTIALS);
         }
 

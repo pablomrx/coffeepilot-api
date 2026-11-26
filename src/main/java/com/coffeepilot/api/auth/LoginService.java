@@ -2,6 +2,7 @@ package com.coffeepilot.api.auth;
 
 import com.coffeepilot.api.auth.dto.LoginRequest;
 import com.coffeepilot.api.auth.dto.LoginResponse;
+import com.coffeepilot.api.common.exception.EmailNotConfirmedException;
 import com.coffeepilot.api.security.JwtService;
 import com.coffeepilot.api.security.LoginAttemptLimiter;
 import com.coffeepilot.api.user.User;
@@ -29,7 +30,6 @@ public class LoginService {
     public LoginResponse login(LoginRequest request) {
         String email = User.normalizeEmail(request.email());
 
-        // Bloqueia antes de consultar o banco e de calcular o BCrypt.
         loginAttemptLimiter.checkAllowed(email);
 
         User user;
@@ -39,18 +39,22 @@ public class LoginService {
                     request.email(),
                     request.password()
             );
-        } catch (AuthenticationException ex) { // ajuste ao tipo real
+        } catch (AuthenticationException ex) {
             loginAttemptLimiter.recordFailure(email);
             throw ex;
         }
 
         loginAttemptLimiter.recordSuccess(email);
 
+        if (!user.isEmailConfirmed()) {
+            throw new EmailNotConfirmedException();
+        }
+
         String token = jwtService.generateToken(user);
 
         return LoginResponse.bearer(
                 token,
-                jwtService.getExpirationSeconds()
+                jwtService.expirationSecondsFor(user)
         );
     }
 }

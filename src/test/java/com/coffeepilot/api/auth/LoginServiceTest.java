@@ -4,12 +4,14 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.coffeepilot.api.auth.dto.LoginRequest;
 import com.coffeepilot.api.auth.dto.LoginResponse;
+import com.coffeepilot.api.common.exception.EmailNotConfirmedException;
 import com.coffeepilot.api.common.exception.TooManyLoginAttemptsException;
 import com.coffeepilot.api.security.JwtService;
 import com.coffeepilot.api.security.LoginAttemptLimiter;
@@ -38,6 +40,9 @@ class LoginServiceTest {
     @Mock
     private User user;
 
+    @Mock
+    private User unconfirmedUser;
+
     private LoginAttemptLimiter limiter;
     private LoginService service;
 
@@ -46,6 +51,9 @@ class LoginServiceTest {
         // Limiter real (limite 3), para provar o comportamento de ponta a ponta.
         limiter = new LoginAttemptLimiter(3, Duration.ofMinutes(15), () -> 1_000_000L);
         service = new LoginService(authenticationService, jwtService, limiter);
+
+        // O usuário padrão dos testes tem o e-mail confirmado.
+        lenient().when(user.isEmailConfirmed()).thenReturn(true);
     }
 
     private LoginRequest request(String email) {
@@ -62,11 +70,23 @@ class LoginServiceTest {
         when(authenticationService.authenticate("dono@teste.com", PASSWORD))
                 .thenReturn(user);
         when(jwtService.generateToken(user)).thenReturn("token-abc");
-        when(jwtService.getExpirationSeconds()).thenReturn(3600L);
+        when(jwtService.expirationSecondsFor(user)).thenReturn(3600L);
 
         LoginResponse response = service.login(request("dono@teste.com"));
 
         assertThat(response).isEqualTo(LoginResponse.bearer("token-abc", 3600L));
+    }
+
+    @Test
+    void validadeDoTokenVemDoServicoDeJwt() {
+        when(authenticationService.authenticate("dono@teste.com", PASSWORD))
+                .thenReturn(user);
+        when(jwtService.generateToken(user)).thenReturn("token-abc");
+        when(jwtService.expirationSecondsFor(user)).thenReturn(28800L);
+
+        LoginResponse response = service.login(request("dono@teste.com"));
+
+        assertThat(response).isEqualTo(LoginResponse.bearer("token-abc", 28800L));
     }
 
     @Test
@@ -137,7 +157,7 @@ class LoginServiceTest {
         when(authenticationService.authenticate("dono@teste.com", PASSWORD))
                 .thenReturn(user);
         when(jwtService.generateToken(user)).thenReturn("t");
-        when(jwtService.getExpirationSeconds()).thenReturn(3600L);
+        when(jwtService.expirationSecondsFor(user)).thenReturn(3600L);
         service.login(request("dono@teste.com"));
 
         org.mockito.Mockito.reset(authenticationService);
@@ -159,7 +179,7 @@ class LoginServiceTest {
         when(authenticationService.authenticate("outro@teste.com", PASSWORD))
                 .thenReturn(user);
         when(jwtService.generateToken(user)).thenReturn("t");
-        when(jwtService.getExpirationSeconds()).thenReturn(3600L);
+        when(jwtService.expirationSecondsFor(user)).thenReturn(3600L);
 
         assertThat(service.login(request("outro@teste.com")).accessToken())
                 .isNotNull();
@@ -174,5 +194,68 @@ class LoginServiceTest {
             assertThatThrownBy(() -> service.login(request("dono@teste.com")))
                     .isInstanceOf(IllegalStateException.class);
         }
+    }
+
+    // ---------- e-mail não confirmado ----------
+
+    @Test
+    void emailNaoConfirmadoNaoGeraToken() {
+        when(authenticationService.authenticate("dono@teste.com", PASSWORD))
+                .thenReturn(unconfirmedUser);
+        when(unconfirmedUser.isEmailConfirmed()).thenReturn(false);
+
+        assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                .isInstanceOf(EmailNotConfirmedException.class);
+
+        verify(jwtService, never()).generateToken(any());
+    }
+
+    @Test
+    void emailNaoConfirmadoNaoContaComoFalhaDeLogin() {
+        when(authenticationService.authenticate("dono@teste.com", PASSWORD))
+                .thenReturn(unconfirmedUser);
+        when(unconfirmedUser.isEmailConfirmed()).thenReturn(false);
+
+        // Mais tentativas que o limite (3): a senha estava correta, então
+        // nunca chega a haver bloqueio.
+        for (int i = 0; i < 5; i++) {
+            assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                    .isInstanceOf(EmailNotConfirmedException.class);
+        }
+    }
+
+    @Test
+    void emailNaoConfirmadoComSenhaCorretaZeraFalhasAnteriores() {
+        stubFailure("dono@teste.com");
+        for (int i = 0; i < 2; i++) {
+            assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                    .isInstanceOf(BadCredentialsException.class);
+        }
+
+        org.mockito.Mockito.reset(authenticationService);
+        when(authenticationService.authenticate("dono@teste.com", PASSWORD))
+                .thenReturn(unconfirmedUser);
+        when(unconfirmedUser.isEmailConfirmed()).thenReturn(false);
+        assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                .isInstanceOf(EmailNotConfirmedException.class);
+
+        org.mockito.Mockito.reset(authenticationService);
+        stubFailure("dono@teste.com");
+        for (int i = 0; i < 3; i++) {
+            assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                    .isInstanceOf(BadCredentialsException.class);
+        }
+    }
+
+    @Test
+    void senhaErradaDeContaNaoConfirmadaContinuaSendoCredencialInvalida() {
+        // A recusa de senha vem do AuthenticationService, antes de qualquer
+        // verificação de confirmação: o 403 nunca revela conta sem senha certa.
+        stubFailure("dono@teste.com");
+
+        assertThatThrownBy(() -> service.login(request("dono@teste.com")))
+                .isInstanceOf(BadCredentialsException.class);
+
+        verify(unconfirmedUser, never()).isEmailConfirmed();
     }
 }
