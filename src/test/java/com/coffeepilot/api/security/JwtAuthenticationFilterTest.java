@@ -20,6 +20,7 @@ import java.nio.charset.StandardCharsets;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.Base64;
 import java.util.List;
@@ -59,13 +60,20 @@ class JwtAuthenticationFilterTest {
         SecurityContextHolder.clearContext();
     }
 
-    private static User user(Establishment establishment) {
+    private static User unconfirmedUser(Establishment establishment) {
         ReflectionTestUtils.setField(establishment, "id", 1L);
 
         User user = new User(
                 establishment, "Ana", "ana@example.com", "hash", Role.OWNER
         );
         ReflectionTestUtils.setField(user, "id", USER_ID);
+
+        return user;
+    }
+
+    private static User user(Establishment establishment) {
+        User user = unconfirmedUser(establishment);
+        user.confirmEmail(OffsetDateTime.parse("2026-11-21T12:00:00Z"));
 
         return user;
     }
@@ -195,6 +203,15 @@ class JwtAuthenticationFilterTest {
         databaseUser.getEstablishment().setActive(false);
 
         runWithToken(tokenOwner, databaseUser);
+
+        assertNull(authentication());
+    }
+
+    @Test
+    void rejectsUserWithUnconfirmedEmail() throws Exception {
+        User user = unconfirmedUser(new Establishment("Cafeteria"));
+
+        runWithToken(user, user);
 
         assertNull(authentication());
     }

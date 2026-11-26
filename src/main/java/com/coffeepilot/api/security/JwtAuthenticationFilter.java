@@ -74,7 +74,9 @@ public class JwtAuthenticationFilter extends OncePerRequestFilter {
         User user = userOptional.get();
         OffsetDateTime now = OffsetDateTime.now(clock);
 
-        if (!user.isActive() || !user.getEstablishment().isUsable(now)) {
+        if (!user.isActive()
+                || !user.isEmailConfirmed()
+                || !user.getEstablishment().isUsable(now)) {
             return;
         }
 
