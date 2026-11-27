@@ -82,6 +82,31 @@ public class GlobalExceptionHandler {
         return ResponseEntity.status(status).body(body);
     }
 
+    @ExceptionHandler(EmailQuotaExceededException.class)
+    public ResponseEntity<CodedApiError> handleEmailQuotaExceeded(
+            EmailQuotaExceededException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.SERVICE_UNAVAILABLE;
+
+        CodedApiError body = new CodedApiError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of(),
+                ex.getCode()
+        );
+
+        return ResponseEntity.status(status)
+                .header(
+                        "Retry-After",
+                        String.valueOf(Math.max(1, ex.getRetryAfterSeconds()))
+                )
+                .body(body);
+    }
+
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ResponseEntity<ApiError> handleEmailAlreadyUsed(
             EmailAlreadyUsedException ex,

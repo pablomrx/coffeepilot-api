@@ -31,4 +31,37 @@ class GlobalExceptionHandlerCodedErrorTest {
         assertTrue(body.fieldErrors().isEmpty());
         assertNotNull(body.timestamp());
     }
+
+    @Test
+    void emailQuotaExceededReturns503WithRetryAfterAndStableCode() {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/v1/auth/forgot-password");
+
+        ResponseEntity<CodedApiError> response = handler.handleEmailQuotaExceeded(
+                new EmailQuotaExceededException(3600), request);
+
+        assertEquals(503, response.getStatusCode().value());
+        assertEquals("3600", response.getHeaders().getFirst("Retry-After"));
+
+        CodedApiError body = response.getBody();
+        assertNotNull(body);
+        assertEquals(503, body.status());
+        assertEquals("EMAIL_QUOTA_EXCEEDED", body.code());
+        assertEquals("/v1/auth/forgot-password", body.path());
+        assertEquals(
+                "Não foi possível enviar o e-mail agora. Tente novamente em breve.",
+                body.message());
+        assertTrue(body.fieldErrors().isEmpty());
+    }
+
+    @Test
+    void emailQuotaExceededNeverSendsRetryAfterBelowOneSecond() {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/v1/auth/register");
+
+        ResponseEntity<CodedApiError> response = handler.handleEmailQuotaExceeded(
+                new EmailQuotaExceededException(0), request);
+
+        assertEquals("1", response.getHeaders().getFirst("Retry-After"));
+    }
 }

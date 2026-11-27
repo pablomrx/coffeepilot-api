@@ -93,3 +93,12 @@ CREATE INDEX idx_user_tokens_user_id
 
 CREATE INDEX idx_user_tokens_expires_at
     ON user_tokens (expires_at);
+
+
+CREATE TABLE email_usage (
+    day DATE PRIMARY KEY,
+    reserved INTEGER NOT NULL DEFAULT 0,
+
+CONSTRAINT ck_email_usage_reserved
+    CHECK (reserved >= 0)
+);
