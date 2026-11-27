@@ -1,4 +1,3 @@
-
 services:
   postgres:
     image: postgres:17
@@ -17,6 +16,17 @@ services:
       interval: 5s
       timeout: 5s
       retries: 5
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: coffeepilot-mailpit
+    restart: unless-stopped
+    environment:
+      MP_MAX_MESSAGES: 500
+    ports:
+      # Só na máquina local: nem o SMTP nem a caixa de entrada ficam na rede.
+      - "127.0.0.1:1025:1025"
+      - "127.0.0.1:8025:8025"
 
 volumes:
   coffeepilot-postgres-data:
