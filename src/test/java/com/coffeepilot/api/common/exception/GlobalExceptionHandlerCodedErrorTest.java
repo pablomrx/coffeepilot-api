@@ -49,7 +49,7 @@ class GlobalExceptionHandlerCodedErrorTest {
         assertEquals("EMAIL_QUOTA_EXCEEDED", body.code());
         assertEquals("/v1/auth/forgot-password", body.path());
         assertEquals(
-                "Não foi possível enviar o e-mail agora. Tente novamente em breve.",
+                "Não foi possível concluir a solicitação agora. Tente novamente mais tarde.",
                 body.message());
         assertTrue(body.fieldErrors().isEmpty());
     }
@@ -63,5 +63,24 @@ class GlobalExceptionHandlerCodedErrorTest {
                 new EmailQuotaExceededException(0), request);
 
         assertEquals("1", response.getHeaders().getFirst("Retry-After"));
+    }
+
+    @Test
+    void invalidTokenReturns400WithStableCode() {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/v1/auth/confirm-email");
+
+        ResponseEntity<CodedApiError> response = handler.handleInvalidToken(
+                new InvalidTokenException(), request);
+
+        assertEquals(400, response.getStatusCode().value());
+
+        CodedApiError body = response.getBody();
+        assertNotNull(body);
+        assertEquals(400, body.status());
+        assertEquals("INVALID_TOKEN", body.code());
+        assertEquals("Link inválido ou expirado.", body.message());
+        assertEquals("/v1/auth/confirm-email", body.path());
+        assertTrue(body.fieldErrors().isEmpty());
     }
 }

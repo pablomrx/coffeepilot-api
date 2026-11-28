@@ -7,7 +7,7 @@ public class EmailQuotaExceededException extends RuntimeException {
     private final long retryAfterSeconds;
 
     public EmailQuotaExceededException(long retryAfterSeconds) {
-        super("Não foi possível enviar o e-mail agora. Tente novamente em breve.");
+        super("Não foi possível concluir a solicitação agora. Tente novamente mais tarde.");
         this.retryAfterSeconds = retryAfterSeconds;
     }
 

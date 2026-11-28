@@ -107,6 +107,26 @@ public class GlobalExceptionHandler {
                 .body(body);
     }
 
+    @ExceptionHandler(InvalidTokenException.class)
+    public ResponseEntity<CodedApiError> handleInvalidToken(
+            InvalidTokenException ex,
+            HttpServletRequest request
+    ) {
+        HttpStatus status = HttpStatus.BAD_REQUEST;
+
+        CodedApiError body = new CodedApiError(
+                Instant.now(),
+                status.value(),
+                status.getReasonPhrase(),
+                ex.getMessage(),
+                request.getRequestURI(),
+                List.of(),
+                ex.getCode()
+        );
+
+        return ResponseEntity.status(status).body(body);
+    }
+
     @ExceptionHandler(EmailAlreadyUsedException.class)
     public ResponseEntity<ApiError> handleEmailAlreadyUsed(
             EmailAlreadyUsedException ex,
