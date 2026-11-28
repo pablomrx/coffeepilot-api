@@ -57,7 +57,7 @@ CREATE TABLE user_tokens (
     user_id BIGINT NOT NULL,
     type VARCHAR(30) NOT NULL,
 
-    token_hash CHAR(64) NOT NULL,
+    token_hash VARCHAR(64) NOT NULL,
 
     expires_at TIMESTAMPTZ NOT NULL,
     used_at TIMESTAMPTZ,
@@ -99,6 +99,6 @@ CREATE TABLE email_usage (
     day DATE PRIMARY KEY,
     reserved INTEGER NOT NULL DEFAULT 0,
 
-CONSTRAINT ck_email_usage_reserved
-    CHECK (reserved >= 0)
+    CONSTRAINT ck_email_usage_reserved
+        CHECK (reserved >= 0)
 );
